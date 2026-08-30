@@ -1,70 +1,64 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = 'https://qfebkqdexgnlwbdzdhqv.supabase.co';
+const supabaseKey = 'sb_publishable_69l8_45AAPqjeCsFdSbeXA_Y2qfJTzT'; 
+const _supabase = createClient(supabaseUrl, supabaseKey);
 
-export default function DashboardClient() {
-  const [clients, setClients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('belum_dihubungi');
+interface ClientItem {
+  id: number;
+  nama: string;
+  no_whatsapp: string;
+  kategori: string;
+  layanan: string;
+  status: string;
+  tanggal_followup: string;
+  catatan: string;
+  pesan_masuk?: string;
+  balasan_bot?: string;
+}
 
-  // State untuk Daftar Template Pesan (Bisa ditambah/edit)
-  const [templates, setTemplates] = useState<any[]>([
-    {
-      id: 'santai',
-      nama: 'Santai / UMKM',
-      teks: 'Halo Kak {nama}, salam kenal ya! Saya lihat profil bisnisnya di {sumber}, kebetulan kami bantu pembuatan {layanan} profesional untuk ningkatin omset bisnis. Boleh diskusi sebentar? 🙏'
-    },
-    {
-      id: 'penawaran',
-      nama: 'Penawaran Langsung',
-      teks: 'Halo {nama}, perkenalkan kami dari tim pengembang digital. Apakah saat ini bisnisnya sedang butuh optimasi {layanan} untuk jangkau lebih banyak pelanggan? Kami ada penawaran spesial minggu ini. Tertarik info lengkapnya? 🚀'
-    },
-    {
-      id: 'formal',
-      nama: 'Formal / Korporat',
-      teks: 'Selamat pagi/siang Bapak/Ibu {nama}. Mohon izin menginfokan terkait layanan {layanan} dari kami, barangkali ada kebutuhan untuk pengembangan digital usahanya. Terima kasih sebelumnya. 😊'
-    },
-    {
-      id: 'genz',
-      nama: 'Gaul / Gen-Z',
-      teks: 'Halo Kak {nama}! 👋 Spill dikit dong, bisnisnya di {sumber} udah pake {layanan} belum? Kita bantu bikin makin aesthetic & gacor penjualannya. Yuk ngobrol santai dulu! ✨'
-    }
-  ]);
-
-  const [selectedTemplateId, setSelectedTemplateId] = useState('santai');
-
-  // State untuk Modal Preview & Edit Chat WA sebelum kirim
-  const [activeChatClient, setActiveChatClient] = useState<any | null>(null);
-  const [customChatText, setCustomChatText] = useState('');
-
-  // State Form Klien
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({
+export default function ProspectDashboard() {
+  const [clients, setClients] = useState<ClientItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('Semua');
+  
+  // State modul tambahan
+  const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [showRateCard, setShowRateCard] = useState<boolean>(false);
+  const [showTemplates, setShowTemplates] = useState<boolean>(false);
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  
+  // State Navigasi Kalender
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  const [newClient, setNewClient] = useState({
     nama: '',
     no_whatsapp: '',
-    sumber: 'Google Maps',
-    layanan: 'Landing Page',
+    kategori: 'Google Maps',
+    layanan: 'Website',
     status: 'Baru',
-    catatan: '',
-    tgl_followup: new Date().toISOString().split('T')[0],
-    followup_count: 0,
-    potensi_cuan: 0,
+    tanggal_followup: new Date().toISOString().split('T')[0],
+    catatan: ''
   });
+
+  const [editingClient, setEditingClient] = useState<ClientItem | null>(null);
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('wa_clients')
+    const { data, error } = await _supabase
+      .from('wa_logs')
       .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (!error && data) setClients(data);
+      .order('id', { ascending: false });
+
+    if (error) {
+      console.error('Gagal memuat data:', error.message);
+    } else {
+      setClients(data || []);
+    }
     setLoading(false);
   };
 
@@ -72,496 +66,716 @@ export default function DashboardClient() {
     fetchClients();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      const { error } = await supabase.from('wa_clients').update(form).eq('id', editingId);
-      if (!error) {
-        setEditingId(null);
-        resetForm();
-        fetchClients();
-      } else {
-        alert('Gagal mengupdate data: ' + error.message);
-      }
+    if (!newClient.nama || !newClient.no_whatsapp) {
+      alert('Nama dan Nomor WhatsApp wajib diisi ya! ✨');
+      return;
+    }
+
+    const { error } = await _supabase
+      .from('wa_logs')
+      .insert([newClient]);
+
+    if (error) {
+      alert(`Gagal menambah data: ${error.message}`);
     } else {
-      const { error } = await supabase.from('wa_clients').insert([form]);
-      if (!error) {
-        resetForm();
-        fetchClients();
-      } else {
-        alert('Gagal menyimpan data: ' + error.message);
-      }
+      alert('Berhasil menjemput bola klien baru! 🎉');
+      setNewClient({
+        nama: '',
+        no_whatsapp: '',
+        kategori: 'Google Maps',
+        layanan: 'Website',
+        status: 'Baru',
+        tanggal_followup: new Date().toISOString().split('T')[0],
+        catatan: ''
+      });
+      setShowAddForm(false);
+      fetchClients();
     }
   };
 
-  const resetForm = () => {
-    setForm({
-      nama: '',
-      no_whatsapp: '',
-      sumber: 'Google Maps',
-      layanan: 'Landing Page',
-      status: 'Baru',
-      catatan: '',
-      tgl_followup: new Date().toISOString().split('T')[0],
-      followup_count: 0,
-      potensi_cuan: 0,
-    });
-  };
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient) return;
 
-  const handleEdit = (client: any) => {
-    setEditingId(client.id);
-    setForm({
-      nama: client.nama,
-      no_whatsapp: client.no_whatsapp,
-      sumber: client.sumber,
-      layanan: client.layanan,
-      status: client.status,
-      catatan: client.catatan || '',
-      tgl_followup: client.tgl_followup || new Date().toISOString().split('T')[0],
-      followup_count: client.followup_count || 0,
-      potensi_cuan: client.potensi_cuan || 0,
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const { error } = await _supabase
+      .from('wa_logs')
+      .update({
+        nama: editingClient.nama,
+        no_whatsapp: editingClient.no_whatsapp,
+        kategori: editingClient.kategori,
+        layanan: editingClient.layanan,
+        status: editingClient.status,
+        tanggal_followup: editingClient.tanggal_followup,
+        catatan: editingClient.catatan,
+      })
+      .eq('id', editingClient.id);
+
+    if (error) {
+      alert(`Gagal mengupdate data: ${error.message}`);
+    } else {
+      alert('Data berhasil diupdate! ✨');
+      setEditingClient(null);
+      fetchClients();
+    }
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Yakin ingin menghapus prospek ini?')) {
-      const { error } = await supabase.from('wa_clients').delete().eq('id', id);
-      if (!error) fetchClients();
-      else alert('Gagal menghapus: ' + error.message);
+    if (!confirm('Yakin ingin menghapus data prospek ini? 🗑️')) return;
+
+    const { error } = await _supabase
+      .from('wa_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert(`Gagal menghapus data: ${error.message}`);
+    } else {
+      alert('Data berhasil dihapus! 🧹');
+      setEditingClient(null);
+      fetchClients();
     }
-  };
-
-  // Fungsi memunculkan Modal Chat dengan template terpilih
-  const openChatModal = (client: any) => {
-    const tpl = templates.find(t => t.id === selectedTemplateId) || templates[0];
-    let generatedText = tpl.teks
-      .replace(/{nama}/g, client.nama)
-      .replace(/{sumber}/g, client.sumber)
-      .replace(/{layanan}/g, client.layanan);
-
-    setActiveChatClient(client);
-    setCustomChatText(generatedText);
-  };
-
-  // Eksekusi kirim WhatsApp & update hitungan follow-up
-  const sendWhatsAppMessage = async () => {
-    if (!activeChatClient) return;
-
-    let phone = activeChatClient.no_whatsapp.replace(/\D/g, '');
-    if (phone.startsWith('0')) {
-      phone = '62' + phone.slice(1);
-    }
-
-    const newCount = (activeChatClient.followup_count || 0) + 1;
-    await supabase
-      .from('wa_clients')
-      .update({ 
-        followup_count: newCount, 
-        status: activeChatClient.status === 'Baru' ? 'Follow-up' : activeChatClient.status 
-      })
-      .eq('id', activeChatClient.id);
-    
-    fetchClients();
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(customChatText)}`, '_blank');
-    setActiveChatClient(null);
-  };
-
-  const handleQuickStatusChange = async (id: number, newStatus: string) => {
-    await supabase.from('wa_clients').update({ status: newStatus }).eq('id', id);
-    fetchClients();
-  };
-
-  const exportToCSV = () => {
-    const headers = 'Nama,No WhatsApp,Sumber,Layanan,Status,Tanggal Follow-Up,Potensi Cuan,Catatan,Jumlah Follow-Up\n';
-    const rows = clients.map(c => 
-      `"${c.nama}","${c.no_whatsapp}","${c.sumber}","${c.layanan}","${c.status}","${c.tgl_followup}",${c.potensi_cuan || 0},"${c.catatan || ''}",${c.followup_count || 0}`
-    ).join('\n');
-    
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `prospek_wa_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const countBelumDihubungi = clients.filter((c) => c.status === 'Baru' && (c.followup_count || 0) === 0).length;
-  const countHariIni = clients.filter((c) => c.tgl_followup <= todayStr && c.status !== 'Tertarik' && c.status !== 'Gagal').length;
-  const countFollowUp = clients.filter((c) => c.status === 'Follow-up').length;
-  const countTertarik = clients.filter((c) => c.status === 'Tertarik').length;
-  const totalProspek = clients.length;
-  const totalCuan = clients.reduce((acc, c) => acc + (Number(c.potensi_cuan) || 0), 0);
+  const filteredClients = clients.filter((client) => {
+    const matchSearch = 
+      client.nama?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.no_whatsapp?.includes(searchQuery) ||
+      client.pesan_masuk?.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const filteredClients = clients.filter((c) => {
-    const matchSearch = c.nama.toLowerCase().includes(search.toLowerCase()) || c.no_whatsapp.includes(search);
-    let matchTab = true;
-    if (activeTab === 'belum_dihubungi') {
-      matchTab = c.status === 'Baru' && (c.followup_count || 0) === 0;
-    } else if (activeTab === 'hari_ini') {
-      matchTab = c.tgl_followup <= todayStr && c.status !== 'Tertarik' && c.status !== 'Gagal';
-    } else if (activeTab === 'follow_up') {
-      matchTab = c.status === 'Follow-up';
-    } else if (activeTab === 'tertarik') {
-      matchTab = c.status === 'Tertarik';
-    } else if (activeTab === 'gagal') {
-      matchTab = c.status === 'Gagal';
-    }
-    return matchSearch && matchTab;
+    if (!matchSearch) return false;
+
+    if (selectedStatus === 'Semua') return true;
+    if (selectedStatus === 'Hari Ini') return client.tanggal_followup === todayStr;
+    if (selectedStatus === 'Terlewat') return client.tanggal_followup && client.tanggal_followup < todayStr && client.status !== 'Tertarik' && client.status !== 'Gagal';
+    
+    return client.status === selectedStatus || (!client.status && selectedStatus === 'Baru');
   });
 
+  const totalProspekUnik = new Set(clients.map(c => c.no_whatsapp)).size;
+
+  // Logika Kalender Bulanan
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8 font-sans bg-[#FAF8F5] min-h-screen text-gray-700 relative">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-[#EFECE6]">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#4A443B] tracking-tight">🌸 WA Client / Jemput Bola Pro</h1>
-          <p className="text-sm text-[#8C8275] mt-1">Dashboard manajemen prospek lengkap dengan kustomisasi template gaya bahasa WA.</p>
-        </div>
-        <button
-          onClick={exportToCSV}
-          className="bg-[#D8E2DC] text-[#3B4D43] px-4 py-2.5 rounded-2xl font-bold hover:bg-[#C8D5CD] transition text-xs flex items-center gap-2 shadow-sm cursor-pointer"
-        >
-          📊 Export ke Excel (CSV)
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#EAE4DC] p-5 rounded-3xl shadow-sm border border-[#DFD8CE]">
-          <p className="text-xs font-bold text-[#6D6356] uppercase tracking-wider">Total Prospek</p>
-          <p className="text-3xl font-extrabold text-[#4A443B] mt-2">{totalProspek}</p>
-        </div>
-        <div className="bg-[#FFE5D9] p-5 rounded-3xl shadow-sm border border-[#FADCD0]">
-          <p className="text-xs font-bold text-[#8C5D50] uppercase tracking-wider">Belum Dihubungi</p>
-          <p className="text-3xl font-extrabold text-[#70463B] mt-2">{countBelumDihubungi}</p>
-        </div>
-        <div className="bg-[#D8E2DC] p-5 rounded-3xl shadow-sm border border-[#C8D5CD]">
-          <p className="text-xs font-bold text-[#556B60] uppercase tracking-wider">Jatuh Tempo Hari Ini</p>
-          <p className="text-3xl font-extrabold text-[#3B4D43] mt-2">{countHariIni}</p>
-        </div>
-        <div className="bg-[#E8F1F2] p-5 rounded-3xl shadow-sm border border-[#D6E5E7]">
-          <p className="text-xs font-bold text-[#4F6D7A] uppercase tracking-wider">Estimasi Potensi Cuan</p>
-          <p className="text-2xl font-extrabold text-[#38515C] mt-2">Rp {totalCuan.toLocaleString('id-ID')}</p>
-        </div>
-      </div>
-
-      {/* Grid: Form Input & Pengelola Template Gaya Bahasa */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form Input Prospek */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-[#EFECE6] lg:col-span-2">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-base font-bold text-[#4A443B]">
-              {editingId ? '✏️ Edit Data Prospek' : '+ Tambah Prospek Baru'}
-            </h2>
-            {editingId && (
-              <button
-                onClick={() => { setEditingId(null); resetForm(); }}
-                className="text-xs bg-[#EFECE6] text-[#6D6356] px-3 py-1.5 rounded-xl font-bold hover:bg-[#DFD8CE] transition"
-              >
-                Batal Edit
-              </button>
-            )}
-          </div>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Nama Klien / Bisnis"
-              value={form.nama}
-              onChange={(e) => setForm({ ...form, nama: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-              required
-            />
-            <input
-              type="text"
-              placeholder="No. WA (cth: 08123456789)"
-              value={form.no_whatsapp}
-              onChange={(e) => setForm({ ...form, no_whatsapp: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-              required
-            />
-            <select
-              value={form.sumber}
-              onChange={(e) => setForm({ ...form, sumber: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            >
-              <option value="Google Maps">Google Maps</option>
-              <option value="Instagram">Instagram</option>
-              <option value="TikTok">TikTok</option>
-              <option value="LinkedIn">LinkedIn</option>
-            </select>
-            <select
-              value={form.layanan}
-              onChange={(e) => setForm({ ...form, layanan: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            >
-              <option value="Landing Page">Landing Page</option>
-              <option value="Web Custom">Web Custom</option>
-              <option value="Mobile App">Mobile App</option>
-            </select>
-            <select
-              value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            >
-              <option value="Baru">Baru</option>
-              <option value="Follow-up">Follow-up</option>
-              <option value="Tertarik">Tertarik</option>
-              <option value="Gagal">Gagal</option>
-            </select>
-            <input
-              type="date"
-              value={form.tgl_followup}
-              onChange={(e) => setForm({ ...form, tgl_followup: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            />
-            <input
-              type="number"
-              placeholder="Potensi Cuan / Budget (Rp)"
-              value={form.potensi_cuan}
-              onChange={(e) => setForm({ ...form, potensi_cuan: Number(e.target.value) })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            />
-            <input
-              type="text"
-              placeholder="Catatan Singkat (opsional)"
-              value={form.catatan}
-              onChange={(e) => setForm({ ...form, catatan: e.target.value })}
-              className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition"
-            />
-            <button type="submit" className="md:col-span-2 bg-[#C8D5CD] text-[#2F3E35] p-3 rounded-2xl font-bold hover:bg-[#B7C6BC] transition cursor-pointer shadow-sm">
-              {editingId ? 'Simpan Perubahan' : 'Simpan Prospek'}
-            </button>
-          </form>
-        </div>
-
-        {/* Kotak Pengaturan Template Pesan WA */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-[#EFECE6] flex flex-col justify-between">
+    <div className="min-h-screen bg-[#FFFDF9] p-4 md:p-8 font-sans text-slate-700">
+      <div className="max-w-5xl mx-auto space-y-6">
+        
+        {/* Header Pastel */}
+        <div className="flex flex-col md:flex-row justify-between items-center bg-[#FFE8EC] p-6 rounded-3xl shadow-sm border border-[#FFD1DC] gap-4">
           <div>
-            <h2 className="text-base font-bold text-[#4A443B] mb-2">💬 Template Gaya Bahasa WA</h2>
-            <p className="text-xs text-[#8C8275] mb-4">Pilih gaya bahasa yang aktif. Gunakan tag <code className="bg-[#FAF8F5] px-1 py-0.5 rounded text-[#4A443B] font-bold">{`{nama}`}</code>, <code className="bg-[#FAF8F5] px-1 py-0.5 rounded text-[#4A443B] font-bold">{`{layanan}`}</code>, dan <code className="bg-[#FAF8F5] px-1 py-0.5 rounded text-[#4A443B] font-bold">{`{sumber}`}</code>.</p>
-            
-            <div className="space-y-3">
-              {templates.map((tpl) => (
-                <div 
-                  key={tpl.id} 
-                  onClick={() => setSelectedTemplateId(tpl.id)}
-                  className={`p-3 rounded-2xl border transition cursor-pointer ${
-                    selectedTemplateId === tpl.id ? 'border-[#6D6356] bg-[#FAF8F5]' : 'border-[#EFECE6] hover:border-[#DFD8CE]'
-                  }`}
+            <h1 className="text-xl font-bold text-[#D65A75]">🌸 WA Jemput Bola Dashboard</h1>
+            <p className="text-xs text-[#B26B7D] mt-0.5">Dilengkapi Kalender Prospek, Rate Card, & Template Chat</p>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-center">
+            <button 
+              onClick={() => setShowCalendar(!showCalendar)}
+              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
+            >
+              {showCalendar ? '✕ Tutup Kalender' : '📅 Kalender Jadwal'}
+            </button>
+            <button 
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
+            >
+              {showTemplates ? '✕ Tutup Template' : '💬 Template Chat'}
+            </button>
+            <button 
+              onClick={() => setShowRateCard(!showRateCard)}
+              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
+            >
+              {showRateCard ? '✕ Tutup Rate Card' : '🏷️ Rate Card'}
+            </button>
+            <button 
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="bg-[#D65A75] hover:bg-[#C24963] text-white px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
+            >
+              {showAddForm ? '✕ Tutup Form' : '➕ Tambah Prospek'}
+            </button>
+            <button 
+              onClick={fetchClients}
+              className="bg-white/80 hover:bg-white text-[#D65A75] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
+            >
+              🔄
+            </button>
+          </div>
+        </div>
+
+        {/* Kalender Interaktif Ber-tag */}
+        {showCalendar && (
+          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
+              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
+                <span>📅</span> Kalender Jadwal Follow-up Prospek
+              </h2>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] px-3 py-1.5 rounded-xl text-xs font-semibold transition"
                 >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-bold text-[#4A443B]">{tpl.nama}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${selectedTemplateId === tpl.id ? 'bg-[#6D6356] text-white' : 'bg-[#EFECE6] text-[#8C8275]'}`}>
-                      {selectedTemplateId === tpl.id ? 'Aktif' : 'Pilih'}
-                    </span>
+                  ◀ Bulan Lalu
+                </button>
+                <span className="text-xs font-bold text-[#D65A75] px-2">
+                  {monthNames[month]} {year}
+                </span>
+                <button 
+                  onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] px-3 py-1.5 rounded-xl text-xs font-semibold transition"
+                >
+                  Bulan Depan ▶
+                </button>
+              </div>
+            </div>
+
+            {/* Grid Hari */}
+            <div className="grid grid-cols-7 gap-2 text-center">
+              {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((d) => (
+                <div key={d} className="text-xs font-bold text-[#B26B7D] py-1">{d}</div>
+              ))}
+
+              {/* Blank space sebelum hari pertama */}
+              {Array.from({ length: firstDayOfMonth }).map((_, index) => (
+                <div key={`empty-${index}`} className="h-24 bg-transparent"></div>
+              ))}
+
+              {/* Kotak Tanggal */}
+              {Array.from({ length: daysInMonth }).map((_, index) => {
+                const dayNum = index + 1;
+                const formattedMonth = String(month + 1).padStart(2, '0');
+                const formattedDay = String(dayNum).padStart(2, '0');
+                const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+
+                // Cari klien yang tanggal follow-up nya sama dengan tanggal ini
+                const clientsOnThisDay = clients.filter(c => c.tanggal_followup === dateStr);
+                const isToday = dateStr === todayStr;
+
+                return (
+                  <div 
+                    key={dateStr} 
+                    className={`h-24 bg-white border rounded-2xl p-1.5 flex flex-col justify-between overflow-y-auto transition ${
+                      isToday ? 'border-[#D65A75] ring-2 ring-[#FFD1DC]' : 'border-pink-100 hover:border-pink-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg ${isToday ? 'bg-[#D65A75] text-white' : 'text-slate-600'}`}>
+                        {dayNum}
+                      </span>
+                      {clientsOnThisDay.length > 0 && (
+                        <span className="text-[10px] bg-pink-100 text-[#D65A75] font-bold px-1 rounded-full">
+                          {clientsOnThisDay.length}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-1 mt-1">
+                      {clientsOnThisDay.map(c => (
+                        <div 
+                          key={c.id} 
+                          onClick={() => setEditingClient(c)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-md truncate cursor-pointer font-medium ${
+                            c.status === 'Tertarik' ? 'bg-[#DCFCE7] text-[#15803D]' :
+                            c.status === 'Follow-up' ? 'bg-[#FEF3C7] text-[#B45309]' :
+                            c.status === 'Gagal' ? 'bg-[#FEE2E2] text-[#B91C1C]' : 'bg-[#E0F2FE] text-[#0369A1]'
+                          }`}
+                          title={`${c.nama} (${c.status || 'Baru'})`}
+                        >
+                          {c.nama}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <textarea
-                    value={tpl.teks}
-                    onChange={(e) => {
-                      const updated = templates.map(t => t.id === tpl.id ? { ...t, teks: e.target.value } : t);
-                      setTemplates(updated);
-                    }}
-                    rows={2}
-                    className="w-full text-xs p-2 rounded-xl bg-white border border-[#EFECE6] text-black outline-none focus:ring-1 focus:ring-[#D8E2DC] resize-none"
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-400 text-center italic">*Klik nama klien pada kalender untuk melihat atau mengedit detail datanya.</p>
+          </div>
+        )}
+
+        {/* Template Chat Section dengan Portofolio */}
+        {showTemplates && (
+          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
+              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
+                <span>💬</span> Template Awalan Chat Jemput Bola + Portofolio
+              </h2>
+              <span className="text-xs bg-[#FFE8EC] text-[#B26B7D] px-3 py-1 rounded-full font-semibold">Klik untuk Salin</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">☕ UMKM Kuliner / Santai</h3>
+                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi yang pernah kubikin bisa dicek di https://rifahan-dev.vercel.app ya Kak. Boleh intip sebentar? ✨&quot;</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi yang pernah kubikin bisa dicek di https://rifahan-dev.vercel.app ya Kak. Boleh intip sebentar? ✨");
+                    alert('Template Kuliner disalin! 📋');
+                  }}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
+                >
+                  Salin Template Ini 📋
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">🤝 Bisnis Formal & Profesional</h3>
+                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis yang kami kembangkan dapat dilihat di https://rifahan-dev.vercel.app. Barangkali tertarik, mari berdiskusi. 🤝&quot;</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis yang kami kembangkan dapat dilihat di https://rifahan-dev.vercel.app. Barangkali tertarik, mari berdiskusi. 🤝");
+                    alert('Template Formal disalin! 📋');
+                  }}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
+                >
+                  Salin Template Ini 📋
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">🚀 Fashion / Retail (Gen Z)</h3>
+                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan-dev.vercel.app. Minat dibantuin gak kak? 🚀&quot;</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan-dev.vercel.app. Minat dibantuin gak kak? 🚀");
+                    alert('Template Fashion disalin! 📋');
+                  }}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
+                >
+                  Salin Template Ini 📋
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">📋 Langsung Bawa Rate Card</h3>
+                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan-dev.vercel.app ya. Kita ada promo paket lengkap mulai Rp 500rb-an aja. Mau dikirimin rincian harganya, Kak? 📋&quot;</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan-dev.vercel.app ya. Kita ada promo paket lengkap mulai Rp 500rb-an aja. Mau dikirimin rincian harganya, Kak? 📋");
+                    alert('Template Rate Card disalin! 📋');
+                  }}
+                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
+                >
+                  Salin Template Ini 📋
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rate Card & Portofolio Section */}
+        {showRateCard && (
+          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-6 animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
+              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
+                <span>🏷️</span> Rate Card & Showcase Portofolio Aplikasi
+              </h2>
+              <span className="text-xs bg-[#FFE8EC] text-[#B26B7D] px-3 py-1 rounded-full font-semibold">Siap Salin & Kirim</span>
+            </div>
+
+            {/* Showcase Portofolio */}
+            <div className="bg-[#FFE8EC]/50 p-4 rounded-2xl border border-[#FFD1DC] space-y-2">
+              <h3 className="text-xs font-bold text-[#D65A75] uppercase tracking-wider">✨ Bukti Karya / Portofolio Utama</h3>
+              <p className="text-xs text-slate-600">Beberapa project yang sudah berhasil dikembangkan dapat dilihat secara lengkap melalui:</p>
+              <a 
+                href="https://rifahan-dev.vercel.app" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block text-xs font-bold text-[#D65A75] underline hover:text-[#C24963]"
+              >
+                🌐 https://rifahan-dev.vercel.app
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
+                <h3 className="font-bold text-[#D65A75]">🌐 Website Bisnis</h3>
+                <p className="text-xs text-slate-500">Landing page / Company profile super cepat & responsive.</p>
+                <p className="text-sm font-extrabold text-slate-800">Rp 750.000 - Rp 1.500.000</p>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo kak, untuk jasa Website Bisnis mulai Rp 750.000 sudah termasuk Domain & Hosting 1 tahun. Portofolio bisa dicek di https://rifahan-dev.vercel.app ✨");
+                    alert('Promo Web disalin!');
+                  }}
+                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
+                >
+                  Salin Promo Web 📋
+                </button>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
+                <h3 className="font-bold text-[#D65A75]">📱 Mobile / Web App</h3>
+                <p className="text-xs text-slate-500">Aplikasi custom interaktif (Journaling, Dashboard, dll).</p>
+                <p className="text-sm font-extrabold text-slate-800">Mulai Rp 2.500.000</p>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo kak, kami menyediakan jasa pembuatan Web & Mobile App custom. Lihat portofolionya di https://rifahan-dev.vercel.app 📱");
+                    alert('Promo App disalin!');
+                  }}
+                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
+                >
+                  Salin Promo App 📋
+                </button>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
+                <h3 className="font-bold text-[#D65A75]">📈 Digital Marketing</h3>
+                <p className="text-xs text-slate-500">Optimasi G-Maps, IG Ads, & pengelolaan konten sosmed.</p>
+                <p className="text-sm font-extrabold text-slate-800">Rp 500.000 / bulan</p>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText("Halo kak, untuk paket Digital Marketing & Optimasi Google Maps harganya Rp 500.000/bulan biar toko makin ramai dicari pelanggan! 🚀");
+                    alert('Promo Marketing disalin!');
+                  }}
+                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
+                >
+                  Salin Promo Marketing 📋
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Statistik Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-[#E0F2FE] p-5 rounded-3xl border border-[#BAE6FD] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#0284C7]">TOTAL DATA / PESAN</p>
+              <h3 className="text-2xl font-bold text-[#0369A1] mt-1">{clients.length}</h3>
+            </div>
+            <span className="text-2xl">💬</span>
+          </div>
+          <div className="bg-[#F3E8FF] p-5 rounded-3xl border border-[#E9D5FF] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#7E22CE]">PROSPEK UNIK</p>
+              <h3 className="text-2xl font-bold text-[#6B21A8] mt-1">{totalProspekUnik}</h3>
+            </div>
+            <span className="text-2xl">👥</span>
+          </div>
+          <div className="bg-[#DCFCE7] p-5 rounded-3xl border border-[#BBF7D0] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#15803D]">STATUS DATABASE</p>
+              <h3 className="text-sm font-bold text-[#166534] mt-1">Terhubung (Supabase) ⚡</h3>
+            </div>
+            <span className="text-2xl">🟢</span>
+          </div>
+        </div>
+
+        {/* Form Input Tambah Klien Baru */}
+        {showAddForm && (
+          <div className="bg-[#FFE8EC] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
+            <h2 className="font-bold text-[#D65A75] flex items-center gap-2 border-b border-[#FFD1DC] pb-3">
+              <span>🎯</span> Form Input Prospek Baru (Jemput Bola)
+            </h2>
+            <form onSubmit={handleAddClient} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Nama Klien / Toko *</label>
+                  <input 
+                    type="text" 
+                    placeholder="Contoh: Toko Bu Irma"
+                    value={newClient.nama} 
+                    onChange={(e) => setNewClient({...newClient, nama: e.target.value})}
+                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                    required
                   />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Control Panel: Search */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-[#EFECE6] flex items-center justify-between">
-        <input
-          type="text"
-          placeholder="🔍 Cari nama klien atau nomor WA..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="p-3 border border-[#EFECE6] rounded-2xl text-black bg-[#FAF8F5] focus:bg-white focus:ring-2 focus:ring-[#D8E2DC] outline-none transition w-full md:w-96 text-sm"
-        />
-        <div className="text-xs font-bold text-[#8C8275] hidden md:block">
-          Template aktif saat ini: <span className="text-[#4A443B] uppercase">{templates.find(t => t.id === selectedTemplateId)?.nama}</span>
-        </div>
-      </div>
-
-      {/* Tab Kategori Pemilahan Utama */}
-      <div className="flex flex-wrap gap-2 border-b border-[#EFECE6] pb-2">
-        {[
-          { id: 'belum_dihubungi', label: `🔥 Belum Dihubungi (${countBelumDihubungi})` },
-          { id: 'hari_ini', label: `⚠️ Jatuh Tempo Hari Ini (${countHariIni})` },
-          { id: 'follow_up', label: `💬 Sedang Follow-up (${countFollowUp})` },
-          { id: 'tertarik', label: `🌟 Tertarik (${countTertarik})` },
-          { id: 'gagal', label: '❌ Gagal' },
-          { id: 'semua', label: `📁 Semua Klien (${totalProspek})` },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-[#4A443B] text-white shadow-sm'
-                : 'bg-white text-[#8C8275] hover:bg-[#EFECE6] border border-[#EFECE6]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tabel */}
-      <div className="bg-white rounded-3xl shadow-sm border border-[#EFECE6] overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-[#FAF8F5] border-b border-[#EFECE6] text-xs text-[#8C8275] uppercase tracking-wider">
-            <tr>
-              <th className="p-4">Klien</th>
-              <th className="p-4">Sumber / Layanan</th>
-              <th className="p-4">Status (Quick Edit)</th>
-              <th className="p-4">Follow-Up</th>
-              <th className="p-4">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#F5F2EC] text-sm text-black">
-            {loading ? (
-              <tr><td colSpan={5} className="p-6 text-center text-[#8C8275]">Memuat data...</td></tr>
-            ) : filteredClients.length === 0 ? (
-              <tr><td colSpan={5} className="p-6 text-center text-[#8C8275]">Tidak ada data dalam kategori ini.</td></tr>
-            ) : (
-              filteredClients.map((c) => {
-                const isDue = c.tgl_followup <= todayStr && c.status !== 'Tertarik' && c.status !== 'Gagal';
-                const isUncontacted = c.status === 'Baru' && (c.followup_count || 0) === 0;
-                return (
-                  <tr key={c.id} className="hover:bg-[#FAF8F5]/85 transition">
-                    <td className="p-4 font-medium">
-                      <div className="text-[#4A443B] font-bold flex items-center gap-2 flex-wrap">
-                        {c.nama}
-                        {isUncontacted && (
-                          <span className="text-[10px] bg-[#FFE5D9] text-[#70463B] px-2 py-0.5 rounded-full font-bold">
-                            🔥 Belum Dihubungi
-                          </span>
-                        )}
-                        {(c.followup_count || 0) > 0 && (
-                          <span className="text-[10px] bg-[#EFECE6] text-[#6D6356] px-2 py-0.5 rounded-full font-semibold">
-                            💬 {c.followup_count}x
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-[#8C8275] mt-0.5">{c.no_whatsapp}</div>
-                      {c.potensi_cuan > 0 && (
-                        <div className="text-xs font-bold text-[#38515C] mt-1">
-                          💰 Rp {Number(c.potensi_cuan).toLocaleString('id-ID')}
-                        </div>
-                      )}
-                      {c.catatan && <div className="text-xs text-[#8C8275] italic mt-1">"{c.catatan}"</div>}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[11px] bg-[#EFECE6] text-[#6D6356] px-2.5 py-0.5 rounded-lg font-medium">{c.sumber}</span>
-                        <span className="text-xs font-semibold text-[#4A443B]">{c.layanan}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <select
-                        value={c.status}
-                        onChange={(e) => handleQuickStatusChange(c.id, e.target.value)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold outline-none cursor-pointer border-none ${
-                          c.status === 'Baru' ? 'bg-[#D8E2DC] text-[#3B4D43]' :
-                          c.status === 'Follow-up' ? 'bg-[#FFE5D9] text-[#70463B]' :
-                          c.status === 'Tertarik' ? 'bg-[#E8F1F2] text-[#38515C]' : 'bg-[#FCEADE] text-[#8C4A4A]'
-                        }`}
-                      >
-                        <option value="Baru">Baru</option>
-                        <option value="Follow-up">Follow-up</option>
-                        <option value="Tertarik">Tertarik</option>
-                        <option value="Gagal">Gagal</option>
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      <div className={`text-xs font-bold ${isDue ? 'text-[#8C4A4A] bg-[#FCEADE] px-2.5 py-1 rounded-xl inline-block' : 'text-[#8C8275]'}`}>
-                        {c.tgl_followup} {isDue && '⚠️'}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => openChatModal(c)}
-                          className="inline-flex items-center gap-1 bg-[#B5C99A] text-[#2C3E21] px-3 py-1.5 rounded-xl hover:bg-[#A3B887] text-xs font-bold transition shadow-sm cursor-pointer"
-                        >
-                          💬 Chat WA
-                        </button>
-                        <button
-                          onClick={() => handleEdit(c)}
-                          className="bg-[#E8F1F2] text-[#38515C] px-2.5 py-1.5 rounded-xl hover:bg-[#D6E5E7] text-xs font-bold transition cursor-pointer"
-                          title="Edit Data"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(c.id)}
-                          className="bg-[#FCEADE] text-[#8C4A4A] px-2.5 py-1.5 rounded-xl hover:bg-[#F8D7C8] text-xs font-bold transition cursor-pointer"
-                          title="Hapus Data"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* POPUP MODAL: Preview & Edit Pesan WA Sebelum Kirim */}
-      {activeChatClient && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-xl border border-[#EFECE6] space-y-4 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-bold text-[#4A443B]">
-                🚀 Preview & Edit Pesan untuk <span className="text-[#38515C]">{activeChatClient.nama}</span>
-              </h3>
+                <div>
+                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">No. WhatsApp *</label>
+                  <input 
+                    type="text" 
+                    placeholder="Contoh: 628131991832..."
+                    value={newClient.no_whatsapp} 
+                    onChange={(e) => setNewClient({...newClient, no_whatsapp: e.target.value})}
+                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Kategori</label>
+                  <select 
+                    value={newClient.kategori} 
+                    onChange={(e) => setNewClient({...newClient, kategori: e.target.value})}
+                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                  >
+                    <option value="Google Maps">Google Maps</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Manual">Manual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Layanan</label>
+                  <select 
+                    value={newClient.layanan} 
+                    onChange={(e) => setNewClient({...newClient, layanan: e.target.value})}
+                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                  >
+                    <option value="Mobile App">Mobile App</option>
+                    <option value="Website">Website</option>
+                    <option value="Digital Marketing">Digital Marketing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Status</label>
+                  <select 
+                    value={newClient.status} 
+                    onChange={(e) => setNewClient({...newClient, status: e.target.value})}
+                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                  >
+                    <option value="Baru">Baru</option>
+                    <option value="Follow-up">Follow-up</option>
+                    <option value="Tertarik">Tertarik</option>
+                    <option value="Gagal">Gagal</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Tanggal Follow-up</label>
+                <input 
+                  type="date" 
+                  value={newClient.tanggal_followup} 
+                  onChange={(e) => setNewClient({...newClient, tanggal_followup: e.target.value})}
+                  className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Catatan Singkat</label>
+                <textarea 
+                  placeholder="Catatan hasil riset atau penawaran..."
+                  value={newClient.catatan} 
+                  onChange={(e) => setNewClient({...newClient, catatan: e.target.value})}
+                  className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+                  rows={2}
+                />
+              </div>
               <button 
-                onClick={() => setActiveChatClient(null)}
-                className="text-xs bg-[#EFECE6] text-[#6D6356] px-2.5 py-1 rounded-xl font-bold hover:bg-[#DFD8CE]"
+                type="submit"
+                className="w-full bg-[#D65A75] hover:bg-[#C24963] text-white font-semibold py-3 rounded-2xl transition shadow-sm"
               >
-                ✕ Batal
+                Simpan Prospek Baru 🚀
               </button>
+            </form>
+          </div>
+        )}
+
+        {/* Form Edit & Delete Modal */}
+        {editingClient && (
+          <div className="bg-[#F3E8FF] p-6 rounded-3xl shadow-md border border-[#E9D5FF] space-y-4">
+            <div className="flex justify-between items-center border-b border-[#E9D5FF] pb-3">
+              <h2 className="font-bold text-[#7E22CE] flex items-center gap-2">
+                <span>🌷</span> Edit Data Klien
+              </h2>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => handleDelete(editingClient.id)}
+                  className="text-xs text-red-500 hover:text-red-700 font-semibold"
+                >
+                  🗑️ Hapus Data
+                </button>
+                <button 
+                  onClick={() => setEditingClient(null)}
+                  className="text-xs text-[#9333EA] hover:text-[#6B21A8] font-semibold"
+                >
+                  ✕ Batal
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-[#8C8275]">
-              Kamu bisa edit bebas teks di bawah ini khusus buat klien ini sebelum diarahkan ke aplikasi WhatsApp.
-            </p>
-            <textarea
-              value={customChatText}
-              onChange={(e) => setCustomChatText(e.target.value)}
-              rows={5}
-              className="w-full p-3 text-sm text-black bg-[#FAF8F5] border border-[#EFECE6] rounded-2xl outline-none focus:ring-2 focus:ring-[#D8E2DC] resize-none"
-            />
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(customChatText);
-                  alert('✨ Teks berhasil disalin ke clipboard!');
-                }}
-                className="bg-[#EFECE6] text-[#6D6356] px-4 py-2.5 rounded-2xl font-bold text-xs hover:bg-[#DFD8CE] transition cursor-pointer"
+            
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Nama Klien</label>
+                  <input 
+                    type="text" 
+                    value={editingClient.nama || ''} 
+                    onChange={(e) => setEditingClient({...editingClient, nama: e.target.value})}
+                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">No. WhatsApp</label>
+                  <input 
+                    type="text" 
+                    value={editingClient.no_whatsapp || ''} 
+                    onChange={(e) => setEditingClient({...editingClient, no_whatsapp: e.target.value})}
+                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Kategori</label>
+                  <select 
+                    value={editingClient.kategori || 'Google Maps'} 
+                    onChange={(e) => setEditingClient({...editingClient, kategori: e.target.value})}
+                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  >
+                    <option value="Google Maps">Google Maps</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Manual">Manual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Layanan</label>
+                  <select 
+                    value={editingClient.layanan || 'Website'} 
+                    onChange={(e) => setEditingClient({...editingClient, layanan: e.target.value})}
+                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  >
+                    <option value="Mobile App">Mobile App</option>
+                    <option value="Website">Website</option>
+                    <option value="Digital Marketing">Digital Marketing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Status</label>
+                  <select 
+                    value={editingClient.status || 'Baru'} 
+                    onChange={(e) => setEditingClient({...editingClient, status: e.target.value})}
+                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  >
+                    <option value="Tertarik">Tertarik</option>
+                    <option value="Baru">Baru</option>
+                    <option value="Follow-up">Follow-up</option>
+                    <option value="Gagal">Gagal</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Tanggal Follow-up</label>
+                <input 
+                  type="date" 
+                  value={editingClient.tanggal_followup || ''} 
+                  onChange={(e) => setEditingClient({...editingClient, tanggal_followup: e.target.value})}
+                  className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Catatan Singkat</label>
+                <textarea 
+                  value={editingClient.catatan || ''} 
+                  onChange={(e) => setEditingClient({...editingClient, catatan: e.target.value})}
+                  className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
+                  rows={2}
+                />
+              </div>
+              <button 
+                type="submit"
+                className="w-full bg-[#A855F7] hover:bg-[#9333EA] text-white font-semibold py-3 rounded-2xl transition shadow-sm"
               >
-                📋 Salin Teks Saja
+                Simpan Perubahan ✨
               </button>
+            </form>
+          </div>
+        )}
+
+        {/* Search & Filter */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-pink-100 space-y-4">
+          <input 
+            type="text" 
+            placeholder="🔍 Cari nama, nomor WA, atau catatan..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#FFFDF9] border border-pink-200 rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
+          />
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {['Semua', 'Hari Ini', 'Terlewat', 'Baru', 'Follow-up', 'Tertarik', 'Gagal'].map((status) => (
               <button
-                onClick={sendWhatsAppMessage}
-                className="bg-[#B5C99A] text-[#2C3E21] px-5 py-2.5 rounded-2xl font-bold text-xs hover:bg-[#A3B887] transition shadow-sm cursor-pointer"
+                key={status}
+                onClick={() => setSelectedStatus(status)}
+                className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition ${
+                  selectedStatus === status 
+                    ? 'bg-[#D65A75] text-white shadow-sm' 
+                    : 'bg-[#FFF0F3] text-[#B26B7D] hover:bg-[#FFE8EC]'
+                }`}
               >
-                Kirim ke WhatsApp Sekarang 🚀
+                {status === 'Hari Ini' ? '🔔 Follow-up Hari Ini' : status === 'Terlewat' ? '⚠️ Terlewat' : status}
               </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* List Data Klien */}
+        <div className="space-y-3">
+          {loading ? (
+            <div className="bg-white p-8 rounded-3xl text-center text-slate-400 text-sm border border-slate-100 shadow-sm">
+              Memuat data...
+            </div>
+          ) : filteredClients.length === 0 ? (
+            <div className="bg-white p-8 rounded-3xl text-center text-slate-400 text-sm border border-slate-100 shadow-sm">
+              Belum ada data prospek di kategori ini. Yuk jemput bola klien baru! 🎯
+            </div>
+          ) : (
+            filteredClients.map((client) => (
+              <div 
+                key={client.id} 
+                className="bg-white p-5 rounded-3xl shadow-sm border border-pink-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-pink-200 transition"
+              >
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-slate-800">{client.nama || 'Tanpa Nama'}</h3>
+                    <span className={`text-[10px] px-3 py-0.5 rounded-full font-bold ${
+                      client.status === 'Tertarik' ? 'bg-[#DCFCE7] text-[#15803D]' :
+                      client.status === 'Baru' || !client.status ? 'bg-[#E0F2FE] text-[#0369A1]' :
+                      client.status === 'Follow-up' ? 'bg-[#FEF3C7] text-[#B45309]' : 'bg-[#FEE2E2] text-[#B91C1C]'
+                    }`}>
+                      {client.status || 'Baru'}
+                    </span>
+                    {client.tanggal_followup && (
+                      <span className="text-[10px] bg-pink-50 text-[#D65A75] px-2.5 py-0.5 rounded-full font-medium">
+                        📅 {client.tanggal_followup}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 font-semibold">+{client.no_whatsapp}</p>
+                  
+                  {client.pesan_masuk && (
+                    <div className="bg-[#FFFDF9] p-2.5 rounded-2xl border border-pink-50 text-xs space-y-1">
+                      <p className="text-slate-600"><span className="font-semibold text-[#D65A75]">Pesan:</span> {client.pesan_masuk}</p>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-slate-400 pt-0.5">
+                    {client.kategori || 'Google Maps'} • {client.layanan || 'Website'} {client.catatan ? `• "${client.catatan}"` : ''}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                  <button 
+                    onClick={() => setEditingClient(client)}
+                    className="bg-[#FDF2F8] hover:bg-[#FCE7F3] text-[#DB2777] px-4 py-2 rounded-2xl text-xs font-semibold transition"
+                  >
+                    Edit
+                  </button>
+                  <a 
+                    href={`https://wa.me/${client.no_whatsapp}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-[#DCFCE7] hover:bg-[#BBF7D0] text-[#15803D] px-4 py-2 rounded-2xl text-xs font-semibold transition text-center"
+                  >
+                    Chat WA 💬
+                  </a>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
