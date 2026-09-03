@@ -1,781 +1,850 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
-const supabaseUrl = 'https://qfebkqdexgnlwbdzdhqv.supabase.co';
-const supabaseKey = 'sb_publishable_69l8_45AAPqjeCsFdSbeXA_Y2qfJTzT'; 
-const _supabase = createClient(supabaseUrl, supabaseKey);
-
-interface ClientItem {
-  id: number;
-  nama: string;
-  no_whatsapp: string;
-  kategori: string;
-  layanan: string;
-  status: string;
-  tanggal_followup: string;
-  catatan: string;
-  pesan_masuk?: string;
-  balasan_bot?: string;
+interface CatatanRiwayat {
+  tanggal: string;
+  teks: string;
 }
 
-export default function ProspectDashboard() {
-  const [clients, setClients] = useState<ClientItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('Semua');
-  
-  // State modul tambahan
-  const [showAddForm, setShowAddForm] = useState<boolean>(false);
-  const [showRateCard, setShowRateCard] = useState<boolean>(false);
-  const [showTemplates, setShowTemplates] = useState<boolean>(false);
-  const [showCalendar, setShowCalendar] = useState<boolean>(false);
-  
-  // State Navigasi Kalender
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  
-  const [newClient, setNewClient] = useState({
-    nama: '',
-    no_whatsapp: '',
-    kategori: 'Google Maps',
-    layanan: 'Website',
-    status: 'Baru',
-    tanggal_followup: new Date().toISOString().split('T')[0],
-    catatan: ''
-  });
+interface Prospek {
+  id: number;
+  nama: string;
+  perusahaan: string;
+  whatsapp: string;
+  kategori: string;
+  status: "Baru" | "Follow-up" | "Deal" | "Ditolak";
+  tanggal: string;
+  riwayatCatatan?: CatatanRiwayat[];
+}
 
-  const [editingClient, setEditingClient] = useState<ClientItem | null>(null);
+export default function Home() {
+  const [modeUtama, setModeUtama] = useState<"prospek" | "personal">("prospek");
+  const [subProspek, setSubProspek] = useState<"list" | "kalender" | "tambah">("list");
+  const [subPersonal, setSubPersonal] = useState<"ratecard" | "template">("ratecard");
 
-  const fetchClients = async () => {
-    setLoading(true);
-    const { data, error } = await _supabase
-      .from('wa_logs')
-      .select('*')
-      .order('id', { ascending: false });
+  const todayStr = new Date().toISOString().split("T")[0];
 
-    if (error) {
-      console.error('Gagal memuat data:', error.message);
-    } else {
-      setClients(data || []);
+  const [prospekList, setProspekList] = useState<Prospek[]>([
+    { 
+      id: 1, 
+      nama: "Ibu Siti", 
+      perusahaan: "Bakso Berkah G-Maps", 
+      whatsapp: "6281234567890", 
+      kategori: "Google Maps", 
+      status: "Baru", 
+      tanggal: todayStr, 
+      riwayatCatatan: [{ tanggal: todayStr, teks: "Tertarik tapi mau tanya suami dulu" }] 
+    },
+    { 
+      id: 2, 
+      nama: "Ka Rian", 
+      perusahaan: "Rian Store Cloth", 
+      whatsapp: "6289876543210", 
+      kategori: "Instagram", 
+      status: "Follow-up", 
+      tanggal: todayStr, 
+      riwayatCatatan: [{ tanggal: "2026-09-02", teks: "Janji kabari minggu depan setelah gajian" }] 
+    },
+    { 
+      id: 3, 
+      nama: "Bpk. Hendra", 
+      perusahaan: "Kopi Senja Lokal", 
+      whatsapp: "6281122334455", 
+      kategori: "Google Maps", 
+      status: "Deal", 
+      tanggal: "2026-09-10", 
+      riwayatCatatan: [{ tanggal: "2026-09-01", teks: "Sudah DP 50%, lanjut buat web" }] 
     }
-    setLoading(false);
-  };
+  ]);
+
+  const [filterStatus, setFilterStatus] = useState<string>("Semua");
+  const [filterKategori, setFilterKategori] = useState<string>("Semua");
+  const [pencarian, setPencarian] = useState("");
+  const [isTerhubung, setIsTerhubung] = useState(true);
+
+  // State Form Quick Input (Di Halaman Utama)
+  const [qNama, setQNama] = useState("");
+  const [qWhatsapp, setQWhatsapp] = useState("");
+  const [qKategori, setQKategori] = useState("Google Maps");
+
+  // State Form Lengkap & Edit (Tab Tambah / Mode Edit)
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [inputNama, setInputNama] = useState("");
+  const [inputPerusahaan, setInputPerusahaan] = useState("");
+  const [inputWhatsapp, setInputWhatsapp] = useState("");
+  const [inputKategori, setInputKategori] = useState("Google Maps");
+  const [inputStatus, setInputStatus] = useState<"Baru" | "Follow-up" | "Deal" | "Ditolak">("Baru");
+  const [inputTanggal, setInputTanggal] = useState(todayStr);
+  const [inputCatatan, setInputCatatan] = useState("");
+
+  // State Input Catatan Tambahan per Klien di Kartu
+  const [aktifInputCatatanId, setAktifInputCatatanId] = useState<number | null>(null);
+  const [teksCatatanBaru, setTeksCatatanBaru] = useState("");
+
+  // State Mode Promo Rate Card
+  const [isPromoAktif, setIsPromoAktif] = useState(true);
 
   useEffect(() => {
-    fetchClients();
+    fetchProspek();
   }, []);
 
-  const handleAddClient = async (e: React.FormEvent) => {
+  const fetchProspek = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("prospek")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (error) throw error;
+      if (data && data.length > 0) setProspekList(data);
+      setIsTerhubung(true);
+    } catch (err) {
+      console.error("Gagal terhubung ke Supabase, menggunakan data lokal:", err);
+      setIsTerhubung(false);
+    }
+  };
+
+  // Fungsi Quick Input dari Beranda
+  const tambahQuickProspek = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClient.nama || !newClient.no_whatsapp) {
-      alert('Nama dan Nomor WhatsApp wajib diisi ya! ✨');
+    if (!qNama.trim() || !qWhatsapp.trim()) {
+      alert("Nama dan No. WhatsApp wajib diisi!");
       return;
     }
 
-    const { error } = await _supabase
-      .from('wa_logs')
-      .insert([newClient]);
-
-    if (error) {
-      alert(`Gagal menambah data: ${error.message}`);
-    } else {
-      alert('Berhasil menjemput bola klien baru! 🎉');
-      setNewClient({
-        nama: '',
-        no_whatsapp: '',
-        kategori: 'Google Maps',
-        layanan: 'Website',
-        status: 'Baru',
-        tanggal_followup: new Date().toISOString().split('T')[0],
-        catatan: ''
-      });
-      setShowAddForm(false);
-      fetchClients();
+    let formatWa = qWhatsapp.trim();
+    if (formatWa.startsWith("0")) {
+      formatWa = "62" + formatWa.slice(1);
     }
+
+    const dataBaru: Prospek = {
+      id: Date.now(),
+      nama: qNama,
+      perusahaan: "Usaha Mandiri / " + qKategori,
+      whatsapp: formatWa,
+      kategori: qKategori,
+      status: "Baru",
+      tanggal: todayStr,
+      riwayatCatatan: [{ tanggal: todayStr, teks: "Input cepat dari beranda jemput bola" }]
+    };
+
+    try {
+      const { data, error } = await supabase.from("prospek").insert([dataBaru]).select();
+      if (error) throw error;
+      if (data) setProspekList([data[0], ...prospekList]);
+    } catch (err) {
+      setProspekList([dataBaru, ...prospekList]);
+    }
+
+    setQNama("");
+    setQWhatsapp("");
+    alert("✅ Prospek baru berhasil ditambahkan!");
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  // Simpan / Update Form Lengkap
+  const simpanProspekLengkap = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingClient) return;
+    if (!inputNama.trim()) return;
 
-    const { error } = await _supabase
-      .from('wa_logs')
-      .update({
-        nama: editingClient.nama,
-        no_whatsapp: editingClient.no_whatsapp,
-        kategori: editingClient.kategori,
-        layanan: editingClient.layanan,
-        status: editingClient.status,
-        tanggal_followup: editingClient.tanggal_followup,
-        catatan: editingClient.catatan,
-      })
-      .eq('id', editingClient.id);
-
-    if (error) {
-      alert(`Gagal mengupdate data: ${error.message}`);
-    } else {
-      alert('Data berhasil diupdate! ✨');
-      setEditingClient(null);
-      fetchClients();
+    let formatWa = inputWhatsapp.trim();
+    if (formatWa.startsWith("0")) {
+      formatWa = "62" + formatWa.slice(1);
     }
+
+    if (editingId !== null) {
+      // MODE EDIT DATA LAMA
+      const listBaru = prospekList.map((item) => {
+        if (item.id === editingId) {
+          return {
+            ...item,
+            nama: inputNama,
+            perusahaan: inputPerusahaan || "Usaha Mandiri",
+            whatsapp: formatWa,
+            kategori: inputKategori,
+            status: inputStatus,
+            tanggal: inputTanggal
+          };
+        }
+        return item;
+      });
+
+      setProspekList(listBaru);
+      const targetItem = listBaru.find(i => i.id === editingId);
+
+      try {
+        await supabase.from("prospek").update({
+          nama: inputNama,
+          perusahaan: inputPerusahaan || "Usaha Mandiri",
+          whatsapp: formatWa,
+          kategori: inputKategori,
+          status: inputStatus,
+          tanggal: inputTanggal
+        }).eq("id", editingId);
+      } catch (err) {}
+
+      setEditingId(null);
+      alert("✅ Data prospek berhasil diperbarui!");
+    } else {
+      // MODE TAMBAH BARU
+      const dataBaru: Prospek = {
+        id: Date.now(),
+        nama: inputNama,
+        perusahaan: inputPerusahaan || "Usaha Mandiri",
+        whatsapp: formatWa,
+        kategori: inputKategori,
+        status: inputStatus,
+        tanggal: inputTanggal,
+        riwayatCatatan: inputCatatan ? [{ tanggal: todayStr, teks: inputCatatan }] : []
+      };
+
+      try {
+        const { data, error } = await supabase.from("prospek").insert([dataBaru]).select();
+        if (error) throw error;
+        if (data) setProspekList([data[0], ...prospekList]);
+      } catch (err) {
+        setProspekList([dataBaru, ...prospekList]);
+      }
+    }
+
+    // Reset Form
+    setInputNama("");
+    setInputPerusahaan("");
+    setInputWhatsapp("");
+    setInputCatatan("");
+    setSubProspek("list");
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Yakin ingin menghapus data prospek ini? 🗑️')) return;
-
-    const { error } = await _supabase
-      .from('wa_logs')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      alert(`Gagal menghapus data: ${error.message}`);
-    } else {
-      alert('Data berhasil dihapus! 🧹');
-      setEditingClient(null);
-      fetchClients();
-    }
+  // Tombol Edit Ditekan dari Kartu
+  const mulaiEditProspek = (item: Prospek) => {
+    setEditingId(item.id);
+    setInputNama(item.nama);
+    setInputPerusahaan(item.perusahaan);
+    setInputWhatsapp(item.whatsapp);
+    setInputKategori(item.kategori);
+    setInputStatus(item.status);
+    setInputTanggal(item.tanggal);
+    setSubProspek("tambah"); // Pindah otomatis ke tab form untuk ngedit
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const ubahStatusCepat = async (id: number, statusBaru: "Baru" | "Follow-up" | "Deal" | "Ditolak") => {
+    const listBaru = prospekList.map((item) => item.id === id ? { ...item, status: statusBaru } : item);
+    setProspekList(listBaru);
+    try {
+      await supabase.from("prospek").update({ status: statusBaru }).eq("id", id);
+    } catch (err) {}
+  };
 
-  const filteredClients = clients.filter((client) => {
-    const matchSearch = 
-      client.nama?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.no_whatsapp?.includes(searchQuery) ||
-      client.pesan_masuk?.toLowerCase().includes(searchQuery.toLowerCase());
+  const tambahCatatanBaru = async (id: number) => {
+    if (!teksCatatanBaru.trim()) return;
 
-    if (!matchSearch) return false;
+    const listBaru = prospekList.map((item) => {
+      if (item.id === id) {
+        const riwayatLama = item.riwayatCatatan || [];
+        const catatanBaruList = [{ tanggal: todayStr, teks: teksCatatanBaru }, ...riwayatLama];
+        return { ...item, riwayatCatatan: catatanBaruList };
+      }
+      return item;
+    });
 
-    if (selectedStatus === 'Semua') return true;
-    if (selectedStatus === 'Hari Ini') return client.tanggal_followup === todayStr;
-    if (selectedStatus === 'Terlewat') return client.tanggal_followup && client.tanggal_followup < todayStr && client.status !== 'Tertarik' && client.status !== 'Gagal';
+    setProspekList(listBaru);
+    setAktifInputCatatanId(null);
+    setTeksCatatanBaru("");
+
+    const targetItem = listBaru.find(i => i.id === id);
+    try {
+      await supabase.from("prospek").update({ riwayatCatatan: targetItem?.riwayatCatatan }).eq("id", id);
+    } catch (err) {}
+  };
+
+  const hapusProspek = async (id: number) => {
+    if (!confirm("Yakin ingin menghapus data prospek ini?")) return;
+    setProspekList(prospekList.filter(item => item.id !== id));
+    try {
+      await supabase.from("prospek").delete().eq("id", id);
+    } catch (err) {}
+  };
+
+  const salinTeks = (teks: string) => {
+    navigator.clipboard.writeText(teks);
+    alert("Berhasil disalin! Siap ditempel.");
+  };
+
+  const exportLaporan = () => {
+    const totalDealCount = prospekList.filter(i => i.status === "Deal").length;
+    let laporan = `📊 *LAPORAN PROSPEK JEMPUT BOLA*\n`;
+    laporan += `Total Klien: ${prospekList.length} | Deal: ${totalDealCount}\n\n`;
     
-    return client.status === selectedStatus || (!client.status && selectedStatus === 'Baru');
+    prospekList.forEach((item, idx) => {
+      laporan += `${idx + 1}. *${item.nama}* (${item.perusahaan})\n   Status: [${item.status}] | WA: ${item.whatsapp}\n\n`;
+    });
+
+    salinTeks(laporan);
+  };
+
+  const listFollowUpHariIni = prospekList.filter(item => item.tanggal === todayStr && (item.status === "Baru" || item.status === "Follow-up"));
+
+  const totalDeal = prospekList.filter(i => i.status === "Deal").length;
+  const totalDitolak = prospekList.filter(i => i.status === "Ditolak").length;
+  const totalProses = prospekList.filter(i => i.status === "Baru" || i.status === "Follow-up").length;
+
+  const filteredList = prospekList.filter((item) => {
+    const cocokPencarian =
+      item.nama.toLowerCase().includes(pencarian.toLowerCase()) ||
+      item.perusahaan.toLowerCase().includes(pencarian.toLowerCase()) ||
+      item.whatsapp.toLowerCase().includes(pencarian.toLowerCase());
+
+    const cocokStatus = filterStatus === "Semua" || item.status === filterStatus;
+    const cocokKategori = filterKategori === "Semua" || item.kategori === filterKategori;
+
+    return cocokPencarian && cocokStatus && cocokKategori;
   });
 
-  const totalProspekUnik = new Set(clients.map(c => c.no_whatsapp)).size;
-
-  // Logika Kalender Bulanan
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const firstDayOfMonth = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-
   return (
-    <div className="min-h-screen bg-[#FFFDF9] p-4 md:p-8 font-sans text-slate-700">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <main className="min-h-screen bg-[#FFFDF9] text-slate-800 flex flex-col font-sans pb-16">
+      <div className="max-w-md w-full mx-auto p-4 space-y-4">
         
-        {/* Header Pastel */}
-        <div className="flex flex-col md:flex-row justify-between items-center bg-[#FFE8EC] p-6 rounded-3xl shadow-sm border border-[#FFD1DC] gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-[#D65A75]">🌸 WA Jemput Bola Dashboard</h1>
-            <p className="text-xs text-[#B26B7D] mt-0.5">Dilengkapi Kalender Prospek, Rate Card, & Template Chat</p>
-          </div>
-          <div className="flex gap-2 flex-wrap justify-center">
-            <button 
-              onClick={() => setShowCalendar(!showCalendar)}
-              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
-            >
-              {showCalendar ? '✕ Tutup Kalender' : '📅 Kalender Jadwal'}
-            </button>
-            <button 
-              onClick={() => setShowTemplates(!showTemplates)}
-              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
-            >
-              {showTemplates ? '✕ Tutup Template' : '💬 Template Chat'}
-            </button>
-            <button 
-              onClick={() => setShowRateCard(!showRateCard)}
-              className="bg-[#FFF0F3] hover:bg-[#FFE8EC] text-[#D65A75] border border-[#FFD1DC] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
-            >
-              {showRateCard ? '✕ Tutup Rate Card' : '🏷️ Rate Card'}
-            </button>
-            <button 
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-[#D65A75] hover:bg-[#C24963] text-white px-4 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
-            >
-              {showAddForm ? '✕ Tutup Form' : '➕ Tambah Prospek'}
-            </button>
-            <button 
-              onClick={fetchClients}
-              className="bg-white/80 hover:bg-white text-[#D65A75] px-3 py-2.5 rounded-2xl text-xs font-semibold shadow-sm transition"
-            >
-              🔄
-            </button>
-          </div>
+        {/* SAKLAR UTAMA */}
+        <div className="bg-[#FFE8EC] border border-[#FFD1DC] p-1.5 rounded-3xl grid grid-cols-2 gap-1 shadow-xs">
+          <button
+            onClick={() => { setModeUtama("prospek"); setSubProspek("list"); }}
+            className={`py-2 text-xs font-bold rounded-2xl transition cursor-pointer ${
+              modeUtama === "prospek" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
+            }`}
+          >
+            🎯 Mode Prospek
+          </button>
+          <button
+            onClick={() => { setModeUtama("personal"); setSubPersonal("ratecard"); }}
+            className={`py-2 text-xs font-bold rounded-2xl transition cursor-pointer ${
+              modeUtama === "personal" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
+            }`}
+          >
+            👤 Mode Personal
+          </button>
         </div>
 
-        {/* Kalender Interaktif Ber-tag */}
-        {showCalendar && (
-          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
-              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
-                <span>📅</span> Kalender Jadwal Follow-up Prospek
-              </h2>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] px-3 py-1.5 rounded-xl text-xs font-semibold transition"
-                >
-                  ◀ Bulan Lalu
-                </button>
-                <span className="text-xs font-bold text-[#D65A75] px-2">
-                  {monthNames[month]} {year}
-                </span>
-                <button 
-                  onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] px-3 py-1.5 rounded-xl text-xs font-semibold transition"
-                >
-                  Bulan Depan ▶
-                </button>
-              </div>
+        {/* ================= AREA MODE PROSPEK ================= */}
+        {modeUtama === "prospek" && (
+          <div className="space-y-4">
+            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl">
+              <button
+                onClick={() => { setSubProspek("list"); setEditingId(null); }}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "list" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                📋 Daftar Klien ({prospekList.length})
+              </button>
+              <button
+                onClick={() => { setSubProspek("kalender"); setEditingId(null); }}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "kalender" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                📅 Kalender
+              </button>
+              <button
+                onClick={() => { 
+                  setSubProspek("tambah"); 
+                  setEditingId(null); 
+                  setInputNama(""); setInputPerusahaan(""); setInputWhatsapp(""); setInputCatatan("");
+                }}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "tambah" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                ➕ {editingId !== null ? "Edit Data" : "Form Baru"}
+              </button>
             </div>
 
-            {/* Grid Hari */}
-            <div className="grid grid-cols-7 gap-2 text-center">
-              {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((d) => (
-                <div key={d} className="text-xs font-bold text-[#B26B7D] py-1">{d}</div>
-              ))}
-
-              {/* Blank space sebelum hari pertama */}
-              {Array.from({ length: firstDayOfMonth }).map((_, index) => (
-                <div key={`empty-${index}`} className="h-24 bg-transparent"></div>
-              ))}
-
-              {/* Kotak Tanggal */}
-              {Array.from({ length: daysInMonth }).map((_, index) => {
-                const dayNum = index + 1;
-                const formattedMonth = String(month + 1).padStart(2, '0');
-                const formattedDay = String(dayNum).padStart(2, '0');
-                const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
-
-                // Cari klien yang tanggal follow-up nya sama dengan tanggal ini
-                const clientsOnThisDay = clients.filter(c => c.tanggal_followup === dateStr);
-                const isToday = dateStr === todayStr;
-
-                return (
-                  <div 
-                    key={dateStr} 
-                    className={`h-24 bg-white border rounded-2xl p-1.5 flex flex-col justify-between overflow-y-auto transition ${
-                      isToday ? 'border-[#D65A75] ring-2 ring-[#FFD1DC]' : 'border-pink-100 hover:border-pink-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg ${isToday ? 'bg-[#D65A75] text-white' : 'text-slate-600'}`}>
-                        {dayNum}
-                      </span>
-                      {clientsOnThisDay.length > 0 && (
-                        <span className="text-[10px] bg-pink-100 text-[#D65A75] font-bold px-1 rounded-full">
-                          {clientsOnThisDay.length}
-                        </span>
-                      )}
+            {subProspek === "list" && (
+              <div className="space-y-3">
+                
+                {/* WIDGET ALERT FOLLOW-UP HARI INI */}
+                {listFollowUpHariIni.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 shadow-xs space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-amber-600 text-sm">🔔</span>
+                      <p className="text-xs font-bold text-amber-800">Perhatian: {listFollowUpHariIni.length} Klien Perlu Dihubungi Hari Ini!</p>
                     </div>
-                    
-                    <div className="space-y-1 mt-1">
-                      {clientsOnThisDay.map(c => (
-                        <div 
-                          key={c.id} 
-                          onClick={() => setEditingClient(c)}
-                          className={`text-[9px] px-1.5 py-0.5 rounded-md truncate cursor-pointer font-medium ${
-                            c.status === 'Tertarik' ? 'bg-[#DCFCE7] text-[#15803D]' :
-                            c.status === 'Follow-up' ? 'bg-[#FEF3C7] text-[#B45309]' :
-                            c.status === 'Gagal' ? 'bg-[#FEE2E2] text-[#B91C1C]' : 'bg-[#E0F2FE] text-[#0369A1]'
-                          }`}
-                          title={`${c.nama} (${c.status || 'Baru'})`}
-                        >
-                          {c.nama}
+                    <div className="space-y-1">
+                      {listFollowUpHariIni.map(item => (
+                        <div key={item.id} className="bg-white/80 border border-amber-100 p-2 rounded-xl flex justify-between items-center text-[11px]">
+                          <span className="font-semibold text-slate-700">{item.nama} ({item.perusahaan})</span>
+                          <a
+                            href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, mau silaturahmi menanyakan kelanjutan diskusi kita kemarin ya Kak.`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg border border-emerald-200"
+                          >
+                            💬 Chat WA
+                          </a>
                         </div>
                       ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-slate-400 text-center italic">*Klik nama klien pada kalender untuk melihat atau mengedit detail datanya.</p>
-          </div>
-        )}
+                )}
 
-        {/* Template Chat Section dengan Portofolio */}
-        {showTemplates && (
-          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
-              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
-                <span>💬</span> Template Awalan Chat Jemput Bola + Portofolio
-              </h2>
-              <span className="text-xs bg-[#FFE8EC] text-[#B26B7D] px-3 py-1 rounded-full font-semibold">Klik untuk Salin</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">☕ UMKM Kuliner / Santai</h3>
-                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi yang pernah kubikin bisa dicek di https://rifahan-dev.vercel.app ya Kak. Boleh intip sebentar? ✨&quot;</p>
-                </div>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi yang pernah kubikin bisa dicek di https://rifahan-dev.vercel.app ya Kak. Boleh intip sebentar? ✨");
-                    alert('Template Kuliner disalin! 📋');
-                  }}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
-                >
-                  Salin Template Ini 📋
-                </button>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">🤝 Bisnis Formal & Profesional</h3>
-                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis yang kami kembangkan dapat dilihat di https://rifahan-dev.vercel.app. Barangkali tertarik, mari berdiskusi. 🤝&quot;</p>
-                </div>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis yang kami kembangkan dapat dilihat di https://rifahan-dev.vercel.app. Barangkali tertarik, mari berdiskusi. 🤝");
-                    alert('Template Formal disalin! 📋');
-                  }}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
-                >
-                  Salin Template Ini 📋
-                </button>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">🚀 Fashion / Retail (Gen Z)</h3>
-                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan-dev.vercel.app. Minat dibantuin gak kak? 🚀&quot;</p>
-                </div>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan-dev.vercel.app. Minat dibantuin gak kak? 🚀");
-                    alert('Template Fashion disalin! 📋');
-                  }}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
-                >
-                  Salin Template Ini 📋
-                </button>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-sm space-y-2 flex flex-col justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-[#D65A75] uppercase">📋 Langsung Bawa Rate Card</h3>
-                  <p className="text-xs text-slate-600 mt-1 italic">&quot;Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan-dev.vercel.app ya. Kita ada promo paket lengkap mulai Rp 500rb-an aja. Mau dikirimin rincian harganya, Kak? 📋&quot;</p>
-                </div>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan-dev.vercel.app ya. Kita ada promo paket lengkap mulai Rp 500rb-an aja. Mau dikirimin rincian harganya, Kak? 📋");
-                    alert('Template Rate Card disalin! 📋');
-                  }}
-                  className="bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition mt-2"
-                >
-                  Salin Template Ini 📋
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Rate Card & Portofolio Section */}
-        {showRateCard && (
-          <div className="bg-[#FFFDF9] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-6 animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-[#FFD1DC] pb-3">
-              <h2 className="font-bold text-[#D65A75] flex items-center gap-2">
-                <span>🏷️</span> Rate Card & Showcase Portofolio Aplikasi
-              </h2>
-              <span className="text-xs bg-[#FFE8EC] text-[#B26B7D] px-3 py-1 rounded-full font-semibold">Siap Salin & Kirim</span>
-            </div>
-
-            {/* Showcase Portofolio */}
-            <div className="bg-[#FFE8EC]/50 p-4 rounded-2xl border border-[#FFD1DC] space-y-2">
-              <h3 className="text-xs font-bold text-[#D65A75] uppercase tracking-wider">✨ Bukti Karya / Portofolio Utama</h3>
-              <p className="text-xs text-slate-600">Beberapa project yang sudah berhasil dikembangkan dapat dilihat secara lengkap melalui:</p>
-              <a 
-                href="https://rifahan-dev.vercel.app" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-block text-xs font-bold text-[#D65A75] underline hover:text-[#C24963]"
-              >
-                🌐 https://rifahan-dev.vercel.app
-              </a>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
-                <h3 className="font-bold text-[#D65A75]">🌐 Website Bisnis</h3>
-                <p className="text-xs text-slate-500">Landing page / Company profile super cepat & responsive.</p>
-                <p className="text-sm font-extrabold text-slate-800">Rp 750.000 - Rp 1.500.000</p>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo kak, untuk jasa Website Bisnis mulai Rp 750.000 sudah termasuk Domain & Hosting 1 tahun. Portofolio bisa dicek di https://rifahan-dev.vercel.app ✨");
-                    alert('Promo Web disalin!');
-                  }}
-                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
-                >
-                  Salin Promo Web 📋
-                </button>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
-                <h3 className="font-bold text-[#D65A75]">📱 Mobile / Web App</h3>
-                <p className="text-xs text-slate-500">Aplikasi custom interaktif (Journaling, Dashboard, dll).</p>
-                <p className="text-sm font-extrabold text-slate-800">Mulai Rp 2.500.000</p>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo kak, kami menyediakan jasa pembuatan Web & Mobile App custom. Lihat portofolionya di https://rifahan-dev.vercel.app 📱");
-                    alert('Promo App disalin!');
-                  }}
-                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
-                >
-                  Salin Promo App 📋
-                </button>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-2">
-                <h3 className="font-bold text-[#D65A75]">📈 Digital Marketing</h3>
-                <p className="text-xs text-slate-500">Optimasi G-Maps, IG Ads, & pengelolaan konten sosmed.</p>
-                <p className="text-sm font-extrabold text-slate-800">Rp 500.000 / bulan</p>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText("Halo kak, untuk paket Digital Marketing & Optimasi Google Maps harganya Rp 500.000/bulan biar toko makin ramai dicari pelanggan! 🚀");
-                    alert('Promo Marketing disalin!');
-                  }}
-                  className="w-full bg-[#FFE8EC] hover:bg-[#FFD1DC] text-[#D65A75] py-2 rounded-xl text-xs font-semibold transition"
-                >
-                  Salin Promo Marketing 📋
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Statistik Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[#E0F2FE] p-5 rounded-3xl border border-[#BAE6FD] shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#0284C7]">TOTAL DATA / PESAN</p>
-              <h3 className="text-2xl font-bold text-[#0369A1] mt-1">{clients.length}</h3>
-            </div>
-            <span className="text-2xl">💬</span>
-          </div>
-          <div className="bg-[#F3E8FF] p-5 rounded-3xl border border-[#E9D5FF] shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#7E22CE]">PROSPEK UNIK</p>
-              <h3 className="text-2xl font-bold text-[#6B21A8] mt-1">{totalProspekUnik}</h3>
-            </div>
-            <span className="text-2xl">👥</span>
-          </div>
-          <div className="bg-[#DCFCE7] p-5 rounded-3xl border border-[#BBF7D0] shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-[#15803D]">STATUS DATABASE</p>
-              <h3 className="text-sm font-bold text-[#166534] mt-1">Terhubung (Supabase) ⚡</h3>
-            </div>
-            <span className="text-2xl">🟢</span>
-          </div>
-        </div>
-
-        {/* Form Input Tambah Klien Baru */}
-        {showAddForm && (
-          <div className="bg-[#FFE8EC] p-6 rounded-3xl shadow-md border border-[#FFD1DC] space-y-4 animate-fadeIn">
-            <h2 className="font-bold text-[#D65A75] flex items-center gap-2 border-b border-[#FFD1DC] pb-3">
-              <span>🎯</span> Form Input Prospek Baru (Jemput Bola)
-            </h2>
-            <form onSubmit={handleAddClient} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Nama Klien / Toko *</label>
-                  <input 
-                    type="text" 
-                    placeholder="Contoh: Toko Bu Irma"
-                    value={newClient.nama} 
-                    onChange={(e) => setNewClient({...newClient, nama: e.target.value})}
-                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">No. WhatsApp *</label>
-                  <input 
-                    type="text" 
-                    placeholder="Contoh: 628131991832..."
-                    value={newClient.no_whatsapp} 
-                    onChange={(e) => setNewClient({...newClient, no_whatsapp: e.target.value})}
-                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Kategori</label>
-                  <select 
-                    value={newClient.kategori} 
-                    onChange={(e) => setNewClient({...newClient, kategori: e.target.value})}
-                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                  >
-                    <option value="Google Maps">Google Maps</option>
-                    <option value="Instagram">Instagram</option>
-                    <option value="Manual">Manual</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Layanan</label>
-                  <select 
-                    value={newClient.layanan} 
-                    onChange={(e) => setNewClient({...newClient, layanan: e.target.value})}
-                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                  >
-                    <option value="Mobile App">Mobile App</option>
-                    <option value="Website">Website</option>
-                    <option value="Digital Marketing">Digital Marketing</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Status</label>
-                  <select 
-                    value={newClient.status} 
-                    onChange={(e) => setNewClient({...newClient, status: e.target.value})}
-                    className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                  >
-                    <option value="Baru">Baru</option>
-                    <option value="Follow-up">Follow-up</option>
-                    <option value="Tertarik">Tertarik</option>
-                    <option value="Gagal">Gagal</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Tanggal Follow-up</label>
-                <input 
-                  type="date" 
-                  value={newClient.tanggal_followup} 
-                  onChange={(e) => setNewClient({...newClient, tanggal_followup: e.target.value})}
-                  className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#B26B7D] block mb-1">Catatan Singkat</label>
-                <textarea 
-                  placeholder="Catatan hasil riset atau penawaran..."
-                  value={newClient.catatan} 
-                  onChange={(e) => setNewClient({...newClient, catatan: e.target.value})}
-                  className="w-full bg-white border border-[#FFD1DC] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-                  rows={2}
-                />
-              </div>
-              <button 
-                type="submit"
-                className="w-full bg-[#D65A75] hover:bg-[#C24963] text-white font-semibold py-3 rounded-2xl transition shadow-sm"
-              >
-                Simpan Prospek Baru 🚀
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Form Edit & Delete Modal */}
-        {editingClient && (
-          <div className="bg-[#F3E8FF] p-6 rounded-3xl shadow-md border border-[#E9D5FF] space-y-4">
-            <div className="flex justify-between items-center border-b border-[#E9D5FF] pb-3">
-              <h2 className="font-bold text-[#7E22CE] flex items-center gap-2">
-                <span>🌷</span> Edit Data Klien
-              </h2>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => handleDelete(editingClient.id)}
-                  className="text-xs text-red-500 hover:text-red-700 font-semibold"
-                >
-                  🗑️ Hapus Data
-                </button>
-                <button 
-                  onClick={() => setEditingClient(null)}
-                  className="text-xs text-[#9333EA] hover:text-[#6B21A8] font-semibold"
-                >
-                  ✕ Batal
-                </button>
-              </div>
-            </div>
-            
-            <form onSubmit={handleUpdate} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Nama Klien</label>
-                  <input 
-                    type="text" 
-                    value={editingClient.nama || ''} 
-                    onChange={(e) => setEditingClient({...editingClient, nama: e.target.value})}
-                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">No. WhatsApp</label>
-                  <input 
-                    type="text" 
-                    value={editingClient.no_whatsapp || ''} 
-                    onChange={(e) => setEditingClient({...editingClient, no_whatsapp: e.target.value})}
-                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Kategori</label>
-                  <select 
-                    value={editingClient.kategori || 'Google Maps'} 
-                    onChange={(e) => setEditingClient({...editingClient, kategori: e.target.value})}
-                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  >
-                    <option value="Google Maps">Google Maps</option>
-                    <option value="Instagram">Instagram</option>
-                    <option value="Manual">Manual</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Layanan</label>
-                  <select 
-                    value={editingClient.layanan || 'Website'} 
-                    onChange={(e) => setEditingClient({...editingClient, layanan: e.target.value})}
-                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  >
-                    <option value="Mobile App">Mobile App</option>
-                    <option value="Website">Website</option>
-                    <option value="Digital Marketing">Digital Marketing</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Status</label>
-                  <select 
-                    value={editingClient.status || 'Baru'} 
-                    onChange={(e) => setEditingClient({...editingClient, status: e.target.value})}
-                    className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  >
-                    <option value="Tertarik">Tertarik</option>
-                    <option value="Baru">Baru</option>
-                    <option value="Follow-up">Follow-up</option>
-                    <option value="Gagal">Gagal</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Tanggal Follow-up</label>
-                <input 
-                  type="date" 
-                  value={editingClient.tanggal_followup || ''} 
-                  onChange={(e) => setEditingClient({...editingClient, tanggal_followup: e.target.value})}
-                  className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#7E22CE] block mb-1">Catatan Singkat</label>
-                <textarea 
-                  value={editingClient.catatan || ''} 
-                  onChange={(e) => setEditingClient({...editingClient, catatan: e.target.value})}
-                  className="w-full bg-white border border-[#E9D5FF] rounded-2xl p-3 text-sm focus:outline-none focus:border-[#A855F7]"
-                  rows={2}
-                />
-              </div>
-              <button 
-                type="submit"
-                className="w-full bg-[#A855F7] hover:bg-[#9333EA] text-white font-semibold py-3 rounded-2xl transition shadow-sm"
-              >
-                Simpan Perubahan ✨
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Search & Filter */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-pink-100 space-y-4">
-          <input 
-            type="text" 
-            placeholder="🔍 Cari nama, nomor WA, atau catatan..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#FFFDF9] border border-pink-200 rounded-2xl p-3 text-sm focus:outline-none focus:border-[#D65A75]"
-          />
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {['Semua', 'Hari Ini', 'Terlewat', 'Baru', 'Follow-up', 'Tertarik', 'Gagal'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition ${
-                  selectedStatus === status 
-                    ? 'bg-[#D65A75] text-white shadow-sm' 
-                    : 'bg-[#FFF0F3] text-[#B26B7D] hover:bg-[#FFE8EC]'
-                }`}
-              >
-                {status === 'Hari Ini' ? '🔔 Follow-up Hari Ini' : status === 'Terlewat' ? '⚠️ Terlewat' : status}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* List Data Klien */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="bg-white p-8 rounded-3xl text-center text-slate-400 text-sm border border-slate-100 shadow-sm">
-              Memuat data...
-            </div>
-          ) : filteredClients.length === 0 ? (
-            <div className="bg-white p-8 rounded-3xl text-center text-slate-400 text-sm border border-slate-100 shadow-sm">
-              Belum ada data prospek di kategori ini. Yuk jemput bola klien baru! 🎯
-            </div>
-          ) : (
-            filteredClients.map((client) => (
-              <div 
-                key={client.id} 
-                className="bg-white p-5 rounded-3xl shadow-sm border border-pink-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-pink-200 transition"
-              >
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-slate-800">{client.nama || 'Tanpa Nama'}</h3>
-                    <span className={`text-[10px] px-3 py-0.5 rounded-full font-bold ${
-                      client.status === 'Tertarik' ? 'bg-[#DCFCE7] text-[#15803D]' :
-                      client.status === 'Baru' || !client.status ? 'bg-[#E0F2FE] text-[#0369A1]' :
-                      client.status === 'Follow-up' ? 'bg-[#FEF3C7] text-[#B45309]' : 'bg-[#FEE2E2] text-[#B91C1C]'
-                    }`}>
-                      {client.status || 'Baru'}
-                    </span>
-                    {client.tanggal_followup && (
-                      <span className="text-[10px] bg-pink-50 text-[#D65A75] px-2.5 py-0.5 rounded-full font-medium">
-                        📅 {client.tanggal_followup}
-                      </span>
-                    )}
+                {/* WIDGET STATISTIK PROSPEK */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-white border border-[#FFD1DC] p-2.5 rounded-2xl text-center shadow-xs">
+                    <p className="text-[10px] text-slate-400 font-semibold">PROSES</p>
+                    <p className="text-sm font-bold text-[#D65A75]">{totalProses}</p>
                   </div>
-                  <p className="text-xs text-slate-500 font-semibold">+{client.no_whatsapp}</p>
-                  
-                  {client.pesan_masuk && (
-                    <div className="bg-[#FFFDF9] p-2.5 rounded-2xl border border-pink-50 text-xs space-y-1">
-                      <p className="text-slate-600"><span className="font-semibold text-[#D65A75]">Pesan:</span> {client.pesan_masuk}</p>
-                    </div>
-                  )}
+                  <div className="bg-white border border-emerald-200 p-2.5 rounded-2xl text-center shadow-xs">
+                    <p className="text-[10px] text-emerald-600 font-semibold">DEAL 🚀</p>
+                    <p className="text-sm font-bold text-emerald-700">{totalDeal}</p>
+                  </div>
+                  <div className="bg-white border border-slate-200 p-2.5 rounded-2xl text-center shadow-xs">
+                    <p className="text-[10px] text-slate-400 font-semibold">DITOLAK</p>
+                    <p className="text-sm font-bold text-slate-600">{totalDitolak}</p>
+                  </div>
+                </div>
 
-                  <p className="text-[11px] text-slate-400 pt-0.5">
-                    {client.kategori || 'Google Maps'} • {client.layanan || 'Website'} {client.catatan ? `• "${client.catatan}"` : ''}
-                  </p>
+                {/* QUICK INPUT FORM (LANGSUNG DI BERANDA) */}
+                <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                  <p className="text-[11px] font-bold text-[#D65A75]">⚡ Quick Input Prospek Baru</p>
+                  <form onSubmit={tambahQuickProspek} className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nama Klien/Toko..."
+                        value={qNama}
+                        onChange={(e) => setQNama(e.target.value)}
+                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="No WA (628... / 08...)"
+                        value={qWhatsapp}
+                        onChange={(e) => setQWhatsapp(e.target.value)}
+                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={qKategori}
+                        onChange={(e) => setQKategori(e.target.value)}
+                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs text-slate-700 flex-1"
+                      >
+                        <option value="Google Maps">Google Maps</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Rekomendasi">Rekomendasi</option>
+                      </select>
+                      <button
+                        type="submit"
+                        className="bg-[#D65A75] hover:bg-[#c24e67] text-white font-semibold text-xs px-4 py-1.5 rounded-xl transition cursor-pointer shrink-0"
+                      >
+                        + Simpan Kilat
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="flex items-center justify-between bg-white border border-[#FFD1DC] rounded-2xl p-3 shadow-sm">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-600">STATUS DATABASE</p>
+                    <p className="text-xs font-bold text-slate-700 mt-0.5">
+                      {isTerhubung ? "Terhubung (Supabase) ⚡" : "Mode Offline / Lokal 💾"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={exportLaporan}
+                    className="bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] text-[11px] font-semibold px-3 py-1.5 rounded-xl border border-[#FFD1DC] transition cursor-pointer"
+                  >
+                    📤 Salin Laporan
+                  </button>
+                </div>
+
+                <section className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                  <input
+                    type="text"
+                    placeholder="Cari nama, perusahaan, atau nomor WA..."
+                    value={pencarian}
+                    onChange={(e) => setPencarian(e.target.value)}
+                    className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs focus:outline-none"
+                  />
+                  
+                  {/* Filter Status */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setFilterStatus(status)}
+                        className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
+                          filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Filter Kategori Sumber */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-[#FFFDF9]">
+                    <span className="text-[10px] text-slate-400 font-bold self-center mr-1">Sumber:</span>
+                    {["Semua", "Google Maps", "Instagram", "Rekomendasi"].map((kat) => (
+                      <button
+                        key={kat}
+                        onClick={() => setFilterKategori(kat)}
+                        className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition shrink-0 cursor-pointer ${
+                          filterKategori === kat ? "bg-slate-700 text-white border-slate-700" : "bg-[#FFFDF9] text-slate-500 border-[#FFD1DC]"
+                        }`}
+                      >
+                        {kat}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="space-y-2.5">
+                  {filteredList.length === 0 ? (
+                    <div className="bg-white border border-[#FFD1DC] rounded-2xl p-8 text-center space-y-2 shadow-sm">
+                      <p className="text-xs text-slate-400">Belum ada data prospek yang cocok.</p>
+                    </div>
+                  ) : (
+                    filteredList.map((item) => (
+                      <div key={item.id} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2.5">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-slate-800 text-xs">{item.nama}</h4>
+                            <p className="text-[11px] text-slate-500">{item.perusahaan} <span className="text-[10px] text-[#D65A75]">({item.kategori})</span></p>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5">
+                            {/* TOMBOL UBAH STATUS CEPAT */}
+                            <select
+                              value={item.status}
+                              onChange={(e) => ubahStatusCepat(item.id, e.target.value as any)}
+                              className={`text-[10px] px-2 py-1 rounded-xl font-semibold border focus:outline-none cursor-pointer ${
+                                item.status === "Deal" 
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                                  : item.status === "Ditolak"
+                                  ? "bg-slate-100 text-slate-500 border-slate-200"
+                                  : "bg-[#FFE8EC] text-[#D65A75] border-[#FFD1DC]"
+                              }`}
+                            >
+                              <option value="Baru">Baru</option>
+                              <option value="Follow-up">Follow-up</option>
+                              <option value="Deal">Deal</option>
+                              <option value="Ditolak">Ditolak</option>
+                            </select>
+
+                            {/* TOMBOL EDIT LENGKAP */}
+                            <button
+                              onClick={() => mulaiEditProspek(item)}
+                              className="text-slate-400 hover:text-[#D65A75] text-xs p-1 cursor-pointer"
+                              title="Edit Data Klien"
+                            >
+                              ✏️
+                            </button>
+
+                            {/* TOMBOL HAPUS */}
+                            <button
+                              onClick={() => hapusProspek(item.id)}
+                              className="text-slate-400 hover:text-red-500 text-xs p-1 cursor-pointer"
+                              title="Hapus Prospek"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* TIMELINE RIWAYAT CATATAN */}
+                        <div className="space-y-1.5 bg-[#FFFDF9] border border-[#FFD1DC] p-2.5 rounded-xl">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-slate-500">📝 Riwayat Obrolan / Catatan:</span>
+                            <button
+                              onClick={() => setAktifInputCatatanId(aktifInputCatatanId === item.id ? null : item.id)}
+                              className="text-[10px] font-bold text-[#D65A75] hover:underline cursor-pointer"
+                            >
+                              {aktifInputCatatanId === item.id ? "Tutup" : "+ Tambah Catatan"}
+                            </button>
+                          </div>
+
+                          {/* Daftar Catatan */}
+                          <div className="space-y-1 pt-1">
+                            {item.riwayatCatatan && item.riwayatCatatan.length > 0 ? (
+                              item.riwayatCatatan.map((rc, idx) => (
+                                <div key={idx} className="text-[11px] text-slate-600 border-l-2 border-[#D65A75] pl-2 py-0.5">
+                                  <span className="text-[9px] text-slate-400 font-mono">[{rc.tanggal}]</span> {rc.teks}
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-[11px] text-slate-400 italic">Belum ada catatan interaksi.</p>
+                            )}
+                          </div>
+
+                          {/* Form Tambah Catatan Kecil */}
+                          {aktifInputCatatanId === item.id && (
+                            <div className="pt-2 flex gap-1.5">
+                              <input
+                                type="text"
+                                placeholder="Tulis hasil chat/obrolan baru..."
+                                value={teksCatatanBaru}
+                                onChange={(e) => setTeksCatatanBaru(e.target.value)}
+                                className="bg-white border border-[#FFD1DC] px-2.5 py-1 rounded-lg text-xs flex-1 focus:outline-none"
+                              />
+                              <button
+                                onClick={() => tambahCatatanBaru(item.id)}
+                                className="bg-[#D65A75] text-white text-[10px] font-bold px-3 py-1 rounded-lg cursor-pointer"
+                              >
+                                Simpan
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between items-center pt-1 border-t border-[#FFFDF9]">
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            📱 {item.whatsapp} • 📅 {item.tanggal}
+                          </span>
+                          <a
+                            href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, salam kenal dari rifahan.dev! Boleh intip portofolio kita ya.`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-3 py-1 rounded-xl border border-emerald-200"
+                          >
+                            💬 Chat WA
+                          </a>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </section>
+              </div>
+            )}
+
+            {subProspek === "kalender" && (
+              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4">
+                <h2 className="text-sm font-bold text-[#D65A75]">📅 Kalender Jadwal Follow-up</h2>
+                <div className="space-y-2">
+                  {prospekList.map((item) => (
+                    <div key={item.id} className="border border-[#FFD1DC] p-3 rounded-2xl bg-[#FFFDF9] flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800">🗓️ {item.tanggal}</span>
+                        <p className="text-slate-600 font-medium mt-0.5">{item.nama} - {item.perusahaan}</p>
+                      </div>
+                      <span className="bg-[#FFE8EC] text-[#D65A75] px-2 py-0.5 rounded-lg text-[10px] font-semibold">{item.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {subProspek === "tambah" && (
+              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-sm font-bold text-[#D65A75]">
+                    {editingId !== null ? "✏️ Edit Data Klien" : "➕ Form Lengkap Input Prospek"}
+                  </h2>
+                  {editingId !== null && (
+                    <button 
+                      onClick={() => { 
+                        setEditingId(null); 
+                        setSubProspek("list"); 
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-red-500 font-semibold"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
                 </div>
                 
-                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                  <button 
-                    onClick={() => setEditingClient(client)}
-                    className="bg-[#FDF2F8] hover:bg-[#FCE7F3] text-[#DB2777] px-4 py-2 rounded-2xl text-xs font-semibold transition"
+                <form onSubmit={simpanProspekLengkap} className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">Nama Klien / Toko *</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Toko Bu Irma"
+                      value={inputNama}
+                      onChange={(e) => setInputNama(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">Nama Perusahaan / Usaha</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Kuliner Enak G-Maps"
+                      value={inputPerusahaan}
+                      onChange={(e) => setInputPerusahaan(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">No. WhatsApp *</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 628131991832..."
+                      value={inputWhatsapp}
+                      onChange={(e) => setInputWhatsapp(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">Kategori Sumber</label>
+                    <select
+                      value={inputKategori}
+                      onChange={(e) => setInputKategori(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
+                    >
+                      <option value="Google Maps">Google Maps</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="Rekomendasi">Rekomendasi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">Status Prospek</label>
+                    <select
+                      value={inputStatus}
+                      onChange={(e) => setInputStatus(e.target.value as any)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
+                    >
+                      <option value="Baru">Baru</option>
+                      <option value="Follow-up">Follow-up</option>
+                      <option value="Deal">Deal</option>
+                      <option value="Ditolak">Ditolak</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500">Tanggal Follow-up</label>
+                    <input
+                      type="date"
+                      value={inputTanggal}
+                      onChange={(e) => setInputTanggal(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1"
+                    />
+                  </div>
+                  {editingId === null && (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500">Catatan Awal</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Belum ada budget, hubungi bulan depan"
+                        value={inputCatatan}
+                        onChange={(e) => setInputCatatan(e.target.value)}
+                        className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    className="w-full bg-[#D65A75] hover:bg-[#c24e67] text-white text-xs font-semibold py-3 rounded-xl transition shadow-sm cursor-pointer mt-2"
                   >
-                    Edit
+                    {editingId !== null ? "💾 Simpan Perubahan" : "🚀 Simpan Prospek Lengkap"}
                   </button>
-                  <a 
-                    href={`https://wa.me/${client.no_whatsapp}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="bg-[#DCFCE7] hover:bg-[#BBF7D0] text-[#15803D] px-4 py-2 rounded-2xl text-xs font-semibold transition text-center"
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================= AREA MODE PERSONAL ================= */}
+        {modeUtama === "personal" && (
+          <div className="space-y-4">
+            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl">
+              <button
+                onClick={() => setSubPersonal("ratecard")}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subPersonal === "ratecard" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                🏷️ Rate Card & Promo
+              </button>
+              <button
+                onClick={() => setSubPersonal("template")}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subPersonal === "template" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                💬 Template Chat
+              </button>
+            </div>
+
+            {subPersonal === "ratecard" && (
+              <div className="space-y-3">
+                <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xs font-bold text-[#D65A75]">🏷️ Pengaturan Harga</h2>
+                    <p className="text-[10px] text-[#B26B7D]">Portofolio: https://rifahan.dev</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsPromoAktif(!isPromoAktif)}
+                    className={`text-[10px] font-bold px-3 py-2 rounded-xl border transition cursor-pointer ${isPromoAktif ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-white text-slate-700 border-[#FFD1DC]"}`}
                   >
-                    Chat WA 💬
-                  </a>
+                    {isPromoAktif ? "✨ Mode Promo Aktif" : "📌 Mode Harga Normal"}
+                  </button>
+                </div>
+
+                <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
+                  <h3 className="text-xs font-bold text-slate-800">🌐 Website Bisnis / Company Profile</h3>
+                  <p className="text-sm font-extrabold text-[#D65A75]">
+                    {isPromoAktif ? "Rp 350.000 (Harga Promo Awal)" : "Rp 750.000 - Rp 1.500.000"}
+                  </p>
+                  <button 
+                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Website Bisnis khusus bulan ini hanya Rp 350.000 saja! Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Website Bisnis profesional mulai Rp 750.000. Cek portofolio di https://rifahan.dev")}
+                    className="w-full bg-[#FFE8EC] text-[#D65A75] text-xs font-semibold py-2 rounded-xl border border-[#FFD1DC] cursor-pointer"
+                  >
+                    📋 Salin Penawaran Web
+                  </button>
+                </div>
+
+                <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
+                  <h3 className="text-xs font-bold text-slate-800">📱 Mobile / Web App Custom</h3>
+                  <p className="text-sm font-extrabold text-[#D65A75]">
+                    {isPromoAktif ? "Rp 1.500.000 (Special Pilot Project)" : "Mulai Rp 2.500.000"}
+                  </p>
+                  <button 
+                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Web/Mobile App khusus awal kerja sama Rp 1.500.000. Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Web App mulai Rp 2.500.000. Cek portofolio di https://rifahan.dev")}
+                    className="w-full bg-[#FFE8EC] text-[#D65A75] text-xs font-semibold py-2 rounded-xl border border-[#FFD1DC] cursor-pointer"
+                  >
+                    📋 Salin Penawaran App
+                  </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            )}
+
+            {subPersonal === "template" && (
+              <div className="space-y-3">
+                <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4">
+                  <h2 className="text-xs font-bold text-[#D65A75]">💬 Template Awal Chat & Portofolio</h2>
+                  <p className="text-[10px] text-[#B26B7D]">Semua template sudah dilengkapi link https://rifahan.dev</p>
+                </div>
+
+                {[
+                  { 
+                    title: "☕ UMKM KULINER / SANTAI", 
+                    text: "Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨" 
+                  },
+                  { 
+                    title: "🏢 BISNIS FORMAL & PROFESIONAL", 
+                    text: "Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝" 
+                  },
+                  { 
+                    title: "🚀 FASHION / RETAIL (GEN Z)", 
+                    text: "Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀" 
+                  },
+                  { 
+                    title: "📦 LANGSUNG BAWA RATE CARD PROMO", 
+                    text: "Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄" 
+                  },
+                  { 
+                    title: "🤝 BALASAN JIKA DITOLAK (SOFT CLOSING)", 
+                    text: "Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨" 
+                  }
+                ].map((tpl, i) => (
+                  <div key={i} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
+                    <p className="text-xs font-bold text-slate-700">{tpl.title}</p>
+                    <p className="text-xs text-slate-600 bg-[#FFFDF9] p-3 rounded-xl border border-[#FFD1DC] leading-relaxed">{tpl.text}</p>
+                    <button 
+                      onClick={() => salinTeks(tpl.text)}
+                      className="w-full bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] font-semibold text-xs py-2 rounded-xl border border-[#FFD1DC] transition cursor-pointer"
+                    >
+                      📋 Salin Template Ini
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
-    </div>
+    </main>
   );
 }
