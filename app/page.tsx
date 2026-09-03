@@ -171,7 +171,6 @@ export default function Home() {
       });
 
       setProspekList(listBaru);
-      const targetItem = listBaru.find(i => i.id === editingId);
 
       try {
         await supabase.from("prospek").update({
@@ -303,32 +302,43 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#FFFDF9] text-slate-800 flex flex-col font-sans pb-16">
-      <div className="max-w-md w-full mx-auto p-4 space-y-4">
+      {/* Container utama diperlebar max-w-5xl supaya pas di layar laptop */}
+      <div className="max-w-5xl w-full mx-auto p-4 md:p-6 space-y-4">
         
-        {/* SAKLAR UTAMA */}
-        <div className="bg-[#FFE8EC] border border-[#FFD1DC] p-1.5 rounded-3xl grid grid-cols-2 gap-1 shadow-xs">
-          <button
-            onClick={() => { setModeUtama("prospek"); setSubProspek("list"); }}
-            className={`py-2 text-xs font-bold rounded-2xl transition cursor-pointer ${
-              modeUtama === "prospek" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
-            }`}
-          >
-            🎯 Mode Prospek
-          </button>
-          <button
-            onClick={() => { setModeUtama("personal"); setSubPersonal("ratecard"); }}
-            className={`py-2 text-xs font-bold rounded-2xl transition cursor-pointer ${
-              modeUtama === "personal" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
-            }`}
-          >
-            👤 Mode Personal
-          </button>
+        {/* HEADER / JUDUL UTAMA */}
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white border border-[#FFD1DC] p-4 rounded-3xl shadow-xs gap-3">
+          <div>
+            <h1 className="text-sm md:text-base font-extrabold text-[#D65A75] flex items-center gap-1.5">
+              🚀 rifahan.dev • Sales Tracker Jemput Bola
+            </h1>
+            <p className="text-[11px] text-slate-400">Dashboard Manajemen Klien & Portofolio</p>
+          </div>
+          
+          {/* SAKLAR UTAMA */}
+          <div className="bg-[#FFE8EC] border border-[#FFD1DC] p-1.5 rounded-2xl grid grid-cols-2 gap-1 shadow-xs w-full md:w-auto">
+            <button
+              onClick={() => { setModeUtama("prospek"); setSubProspek("list"); }}
+              className={`py-1.5 px-4 text-xs font-bold rounded-xl transition cursor-pointer ${
+                modeUtama === "prospek" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
+              }`}
+            >
+              🎯 Mode Prospek
+            </button>
+            <button
+              onClick={() => { setModeUtama("personal"); setSubPersonal("ratecard"); }}
+              className={`py-1.5 px-4 text-xs font-bold rounded-xl transition cursor-pointer ${
+                modeUtama === "personal" ? "bg-[#D65A75] text-white shadow-xs" : "text-slate-600 hover:bg-white/50"
+              }`}
+            >
+              👤 Mode Personal
+            </button>
+          </div>
         </div>
 
         {/* ================= AREA MODE PROSPEK ================= */}
         {modeUtama === "prospek" && (
           <div className="space-y-4">
-            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl">
+            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl max-w-md">
               <button
                 onClick={() => { setSubProspek("list"); setEditingId(null); }}
                 className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "list" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
@@ -354,54 +364,32 @@ export default function Home() {
             </div>
 
             {subProspek === "list" && (
-              <div className="space-y-3">
+              /* LAYOUT LAPTOP: Menggunakan Grid 2 Kolom (Kiri: Panel Kontrol & Input, Kanan: Daftar Kartu Klien) */
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 
-                {/* WIDGET ALERT FOLLOW-UP HARI INI */}
-                {listFollowUpHariIni.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 shadow-xs space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-amber-600 text-sm">🔔</span>
-                      <p className="text-xs font-bold text-amber-800">Perhatian: {listFollowUpHariIni.length} Klien Perlu Dihubungi Hari Ini!</p>
+                {/* KOLOM KIRI (Lebar 1 grid di laptop): Statistik, Quick Input, Filter */}
+                <div className="space-y-3 lg:col-span-1">
+                  
+                  {/* WIDGET STATISTIK PROSPEK */}
+                  <div className="grid grid-cols-3 lg:grid-cols-3 gap-2">
+                    <div className="bg-white border border-[#FFD1DC] p-2.5 rounded-2xl text-center shadow-xs">
+                      <p className="text-[10px] text-slate-400 font-semibold">PROSES</p>
+                      <p className="text-sm font-bold text-[#D65A75]">{totalProses}</p>
                     </div>
-                    <div className="space-y-1">
-                      {listFollowUpHariIni.map(item => (
-                        <div key={item.id} className="bg-white/80 border border-amber-100 p-2 rounded-xl flex justify-between items-center text-[11px]">
-                          <span className="font-semibold text-slate-700">{item.nama} ({item.perusahaan})</span>
-                          <a
-                            href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, mau silaturahmi menanyakan kelanjutan diskusi kita kemarin ya Kak.`)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg border border-emerald-200"
-                          >
-                            💬 Chat WA
-                          </a>
-                        </div>
-                      ))}
+                    <div className="bg-white border border-emerald-200 p-2.5 rounded-2xl text-center shadow-xs">
+                      <p className="text-[10px] text-emerald-600 font-semibold">DEAL 🚀</p>
+                      <p className="text-sm font-bold text-emerald-700">{totalDeal}</p>
+                    </div>
+                    <div className="bg-white border border-slate-200 p-2.5 rounded-2xl text-center shadow-xs">
+                      <p className="text-[10px] text-slate-400 font-semibold">DITOLAK</p>
+                      <p className="text-sm font-bold text-slate-600">{totalDitolak}</p>
                     </div>
                   </div>
-                )}
 
-                {/* WIDGET STATISTIK PROSPEK */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-white border border-[#FFD1DC] p-2.5 rounded-2xl text-center shadow-xs">
-                    <p className="text-[10px] text-slate-400 font-semibold">PROSES</p>
-                    <p className="text-sm font-bold text-[#D65A75]">{totalProses}</p>
-                  </div>
-                  <div className="bg-white border border-emerald-200 p-2.5 rounded-2xl text-center shadow-xs">
-                    <p className="text-[10px] text-emerald-600 font-semibold">DEAL 🚀</p>
-                    <p className="text-sm font-bold text-emerald-700">{totalDeal}</p>
-                  </div>
-                  <div className="bg-white border border-slate-200 p-2.5 rounded-2xl text-center shadow-xs">
-                    <p className="text-[10px] text-slate-400 font-semibold">DITOLAK</p>
-                    <p className="text-sm font-bold text-slate-600">{totalDitolak}</p>
-                  </div>
-                </div>
-
-                {/* QUICK INPUT FORM (LANGSUNG DI BERANDA) */}
-                <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
-                  <p className="text-[11px] font-bold text-[#D65A75]">⚡ Quick Input Prospek Baru</p>
-                  <form onSubmit={tambahQuickProspek} className="grid grid-cols-1 gap-2">
-                    <div className="grid grid-cols-2 gap-2">
+                  {/* QUICK INPUT FORM */}
+                  <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                    <p className="text-[11px] font-bold text-[#D65A75]">⚡ Quick Input Prospek Baru</p>
+                    <form onSubmit={tambahQuickProspek} className="grid grid-cols-1 gap-2">
                       <input
                         type="text"
                         placeholder="Nama Klien/Toko..."
@@ -416,203 +404,239 @@ export default function Home() {
                         onChange={(e) => setQWhatsapp(e.target.value)}
                         className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
                       />
-                    </div>
-                    <div className="flex gap-2">
-                      <select
-                        value={qKategori}
-                        onChange={(e) => setQKategori(e.target.value)}
-                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs text-slate-700 flex-1"
-                      >
-                        <option value="Google Maps">Google Maps</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="Rekomendasi">Rekomendasi</option>
-                      </select>
-                      <button
-                        type="submit"
-                        className="bg-[#D65A75] hover:bg-[#c24e67] text-white font-semibold text-xs px-4 py-1.5 rounded-xl transition cursor-pointer shrink-0"
-                      >
-                        + Simpan Kilat
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="flex items-center justify-between bg-white border border-[#FFD1DC] rounded-2xl p-3 shadow-sm">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-600">STATUS DATABASE</p>
-                    <p className="text-xs font-bold text-slate-700 mt-0.5">
-                      {isTerhubung ? "Terhubung (Supabase) ⚡" : "Mode Offline / Lokal 💾"}
-                    </p>
+                      <div className="flex gap-2">
+                        <select
+                          value={qKategori}
+                          onChange={(e) => setQKategori(e.target.value)}
+                          className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs text-slate-700 flex-1"
+                        >
+                          <option value="Google Maps">Google Maps</option>
+                          <option value="Instagram">Instagram</option>
+                          <option value="Rekomendasi">Rekomendasi</option>
+                        </select>
+                        <button
+                          type="submit"
+                          className="bg-[#D65A75] hover:bg-[#c24e67] text-white font-semibold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0"
+                        >
+                          + Simpan Kilat
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                  <button
-                    onClick={exportLaporan}
-                    className="bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] text-[11px] font-semibold px-3 py-1.5 rounded-xl border border-[#FFD1DC] transition cursor-pointer"
-                  >
-                    📤 Salin Laporan
-                  </button>
+
+                  {/* STATUS DATABASE & LAPORAN */}
+                  <div className="flex items-center justify-between bg-white border border-[#FFD1DC] rounded-2xl p-3 shadow-sm">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-600">STATUS DATABASE</p>
+                      <p className="text-xs font-bold text-slate-700 mt-0.5">
+                        {isTerhubung ? "Terhubung (Supabase) ⚡" : "Mode Offline / Lokal 💾"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={exportLaporan}
+                      className="bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] text-[11px] font-semibold px-3 py-1.5 rounded-xl border border-[#FFD1DC] transition cursor-pointer"
+                    >
+                      📤 Salin Laporan
+                    </button>
+                  </div>
+
                 </div>
 
-                <section className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
-                  <input
-                    type="text"
-                    placeholder="Cari nama, perusahaan, atau nomor WA..."
-                    value={pencarian}
-                    onChange={(e) => setPencarian(e.target.value)}
-                    className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs focus:outline-none"
-                  />
+                {/* KOLOM KANAN (Lebar 2 grid di laptop): Alert, Pencarian, & Daftar Kartu Klien */}
+                <div className="space-y-3 lg:col-span-2">
                   
-                  {/* Filter Status */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1">
-                    {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setFilterStatus(status)}
-                        className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
-                          filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Filter Kategori Sumber */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-[#FFFDF9]">
-                    <span className="text-[10px] text-slate-400 font-bold self-center mr-1">Sumber:</span>
-                    {["Semua", "Google Maps", "Instagram", "Rekomendasi"].map((kat) => (
-                      <button
-                        key={kat}
-                        onClick={() => setFilterKategori(kat)}
-                        className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition shrink-0 cursor-pointer ${
-                          filterKategori === kat ? "bg-slate-700 text-white border-slate-700" : "bg-[#FFFDF9] text-slate-500 border-[#FFD1DC]"
-                        }`}
-                      >
-                        {kat}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="space-y-2.5">
-                  {filteredList.length === 0 ? (
-                    <div className="bg-white border border-[#FFD1DC] rounded-2xl p-8 text-center space-y-2 shadow-sm">
-                      <p className="text-xs text-slate-400">Belum ada data prospek yang cocok.</p>
+                  {/* WIDGET ALERT FOLLOW-UP HARI INI */}
+                  {listFollowUpHariIni.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 shadow-xs space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-amber-600 text-sm">🔔</span>
+                        <p className="text-xs font-bold text-amber-800">Perhatian: {listFollowUpHariIni.length} Klien Perlu Dihubungi Hari Ini!</p>
+                      </div>
+                      <div className="space-y-1">
+                        {listFollowUpHariIni.map(item => (
+                          <div key={item.id} className="bg-white/80 border border-amber-100 p-2 rounded-xl flex justify-between items-center text-[11px]">
+                            <span className="font-semibold text-slate-700">{item.nama} ({item.perusahaan})</span>
+                            <a
+                              href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, mau silaturahmi menanyakan kelanjutan diskusi kita kemarin ya Kak.`)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg border border-emerald-200"
+                            >
+                              💬 Chat WA
+                            </a>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    filteredList.map((item) => (
-                      <div key={item.id} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2.5">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-bold text-slate-800 text-xs">{item.nama}</h4>
-                            <p className="text-[11px] text-slate-500">{item.perusahaan} <span className="text-[10px] text-[#D65A75]">({item.kategori})</span></p>
+                  )}
+
+                  {/* FILTER DAN PENCARIAN */}
+                  <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                    <input
+                      type="text"
+                      placeholder="Cari nama, perusahaan, atau nomor WA..."
+                      value={pencarian}
+                      onChange={(e) => setPencarian(e.target.value)}
+                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs focus:outline-none"
+                    />
+                    
+                    <div className="flex flex-wrap gap-1.5 items-center justify-between">
+                      {/* Filter Status */}
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => setFilterStatus(status)}
+                            className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
+                              filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
+                            }`}
+                          >
+                            {status}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Filter Kategori Sumber */}
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {["Semua", "Google Maps", "Instagram", "Rekomendasi"].map((kat) => (
+                          <button
+                            key={kat}
+                            onClick={() => setFilterKategori(kat)}
+                            className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition shrink-0 cursor-pointer ${
+                              filterKategori === kat ? "bg-slate-700 text-white border-slate-700" : "bg-[#FFFDF9] text-slate-500 border-[#FFD1DC]"
+                            }`}
+                          >
+                            {kat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DAFTAR KARTU KLIEN (Bisa jadi 2 kolom grid di layar laptop yang sangat luas) */}
+                  <div className="space-y-2.5">
+                    {filteredList.length === 0 ? (
+                      <div className="bg-white border border-[#FFD1DC] rounded-2xl p-8 text-center space-y-2 shadow-sm">
+                        <p className="text-xs text-slate-400">Belum ada data prospek yang cocok.</p>
+                      </div>
+                    ) : (
+                      filteredList.map((item) => (
+                        <div key={item.id} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2.5">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-bold text-slate-800 text-xs">{item.nama}</h4>
+                              <p className="text-[11px] text-slate-500">{item.perusahaan} <span className="text-[10px] text-[#D65A75]">({item.kategori})</span></p>
+                            </div>
+                            
+                            <div className="flex items-center gap-1.5">
+                              {/* TOMBOL UBAH STATUS CEPAT */}
+                              <select
+                                value={item.status}
+                                onChange={(e) => ubahStatusCepat(item.id, e.target.value as any)}
+                                className={`text-[10px] px-2 py-1 rounded-xl font-semibold border focus:outline-none cursor-pointer ${
+                                  item.status === "Deal" 
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                                    : item.status === "Ditolak"
+                                    ? "bg-slate-100 text-slate-500 border-slate-200"
+                                    : "bg-[#FFE8EC] text-[#D65A75] border-[#FFD1DC]"
+                                }`}
+                              >
+                                <option value="Baru">Baru</option>
+                                <option value="Follow-up">Follow-up</option>
+                                <option value="Deal">Deal</option>
+                                <option value="Ditolak">Ditolak</option>
+                              </select>
+
+                              {/* TOMBOL EDIT LENGKAP */}
+                              <button
+                                onClick={() => mulaiEditProspek(item)}
+                                className="text-slate-400 hover:text-[#D65A75] text-xs p-1 cursor-pointer"
+                                title="Edit Data Klien"
+                              >
+                                ✏️
+                              </button>
+
+                              {/* TOMBOL HAPUS */}
+                              <button
+                                onClick={() => hapusProspek(item.id)}
+                                className="text-slate-400 hover:text-red-500 text-xs p-1 cursor-pointer"
+                                title="Hapus Prospek"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
-                          
-                          <div className="flex items-center gap-1.5">
-                            {/* TOMBOL UBAH STATUS CEPAT */}
-                            <select
-                              value={item.status}
-                              onChange={(e) => ubahStatusCepat(item.id, e.target.value as any)}
-                              className={`text-[10px] px-2 py-1 rounded-xl font-semibold border focus:outline-none cursor-pointer ${
-                                item.status === "Deal" 
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                                  : item.status === "Ditolak"
-                                  ? "bg-slate-100 text-slate-500 border-slate-200"
-                                  : "bg-[#FFE8EC] text-[#D65A75] border-[#FFD1DC]"
-                              }`}
-                            >
-                              <option value="Baru">Baru</option>
-                              <option value="Follow-up">Follow-up</option>
-                              <option value="Deal">Deal</option>
-                              <option value="Ditolak">Ditolak</option>
-                            </select>
 
-                            {/* TOMBOL EDIT LENGKAP */}
-                            <button
-                              onClick={() => mulaiEditProspek(item)}
-                              className="text-slate-400 hover:text-[#D65A75] text-xs p-1 cursor-pointer"
-                              title="Edit Data Klien"
-                            >
-                              ✏️
-                            </button>
+                          {/* TIMELINE RIWAYAT CATATAN */}
+                          <div className="space-y-1.5 bg-[#FFFDF9] border border-[#FFD1DC] p-2.5 rounded-xl">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-slate-500">📝 Riwayat Obrolan / Catatan:</span>
+                              <button
+                                onClick={() => setAktifInputCatatanId(aktifInputCatatanId === item.id ? null : item.id)}
+                                className="text-[10px] font-bold text-[#D65A75] hover:underline cursor-pointer"
+                              >
+                                {aktifInputCatatanId === item.id ? "Tutup" : "+ Tambah Catatan"}
+                              </button>
+                            </div>
 
-                            {/* TOMBOL HAPUS */}
-                            <button
-                              onClick={() => hapusProspek(item.id)}
-                              className="text-slate-400 hover:text-red-500 text-xs p-1 cursor-pointer"
-                              title="Hapus Prospek"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
+                            {/* Daftar Catatan */}
+                            <div className="space-y-1 pt-1">
+                              {item.riwayatCatatan && item.riwayatCatatan.length > 0 ? (
+                                item.riwayatCatatan.map((rc, idx) => (
+                                  <div key={idx} className="text-[11px] text-slate-600 border-l-2 border-[#D65A75] pl-2 py-0.5">
+                                    <span className="text-[9px] text-slate-400 font-mono">[{rc.tanggal}]</span> {rc.teks}
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-[11px] text-slate-400 italic">Belum ada catatan interaksi.</p>
+                              )}
+                            </div>
 
-                        {/* TIMELINE RIWAYAT CATATAN */}
-                        <div className="space-y-1.5 bg-[#FFFDF9] border border-[#FFD1DC] p-2.5 rounded-xl">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-slate-500">📝 Riwayat Obrolan / Catatan:</span>
-                            <button
-                              onClick={() => setAktifInputCatatanId(aktifInputCatatanId === item.id ? null : item.id)}
-                              className="text-[10px] font-bold text-[#D65A75] hover:underline cursor-pointer"
-                            >
-                              {aktifInputCatatanId === item.id ? "Tutup" : "+ Tambah Catatan"}
-                            </button>
-                          </div>
-
-                          {/* Daftar Catatan */}
-                          <div className="space-y-1 pt-1">
-                            {item.riwayatCatatan && item.riwayatCatatan.length > 0 ? (
-                              item.riwayatCatatan.map((rc, idx) => (
-                                <div key={idx} className="text-[11px] text-slate-600 border-l-2 border-[#D65A75] pl-2 py-0.5">
-                                  <span className="text-[9px] text-slate-400 font-mono">[{rc.tanggal}]</span> {rc.teks}
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-[11px] text-slate-400 italic">Belum ada catatan interaksi.</p>
+                            {/* Form Tambah Catatan Kecil */}
+                            {aktifInputCatatanId === item.id && (
+                              <div className="pt-2 flex gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="Tulis hasil chat/obrolan baru..."
+                                  value={teksCatatanBaru}
+                                  onChange={(e) => setTeksCatatanBaru(e.target.value)}
+                                  className="bg-white border border-[#FFD1DC] px-2.5 py-1 rounded-lg text-xs flex-1 focus:outline-none"
+                                />
+                                <button
+                                  onClick={() => tambahCatatanBaru(item.id)}
+                                  className="bg-[#D65A75] text-white text-[10px] font-bold px-3 py-1 rounded-lg cursor-pointer"
+                                >
+                                  Simpan
+                                </button>
+                              </div>
                             )}
                           </div>
 
-                          {/* Form Tambah Catatan Kecil */}
-                          {aktifInputCatatanId === item.id && (
-                            <div className="pt-2 flex gap-1.5">
-                              <input
-                                type="text"
-                                placeholder="Tulis hasil chat/obrolan baru..."
-                                value={teksCatatanBaru}
-                                onChange={(e) => setTeksCatatanBaru(e.target.value)}
-                                className="bg-white border border-[#FFD1DC] px-2.5 py-1 rounded-lg text-xs flex-1 focus:outline-none"
-                              />
-                              <button
-                                onClick={() => tambahCatatanBaru(item.id)}
-                                className="bg-[#D65A75] text-white text-[10px] font-bold px-3 py-1 rounded-lg cursor-pointer"
-                              >
-                                Simpan
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex justify-between items-center pt-1 border-t border-[#FFFDF9]">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              📱 {item.whatsapp} • 📅 {item.tanggal}
+                            </span>
+                            <a
+                              href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, salam kenal dari rifahan.dev! Boleh intip portofolio kita ya.`)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-3 py-1 rounded-xl border border-emerald-200"
+                            >
+                              💬 Chat WA
+                            </a>
+                          </div>
                         </div>
+                      ))
+                    )}
+                  </div>
 
-                        <div className="flex justify-between items-center pt-1 border-t border-[#FFFDF9]">
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            📱 {item.whatsapp} • 📅 {item.tanggal}
-                          </span>
-                          <a
-                            href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, salam kenal dari rifahan.dev! Boleh intip portofolio kita ya.`)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-3 py-1 rounded-xl border border-emerald-200"
-                          >
-                            💬 Chat WA
-                          </a>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </section>
+                </div>
+
               </div>
             )}
 
             {subProspek === "kalender" && (
-              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4 max-w-xl mx-auto">
                 <h2 className="text-sm font-bold text-[#D65A75]">📅 Kalender Jadwal Follow-up</h2>
                 <div className="space-y-2">
                   {prospekList.map((item) => (
@@ -629,7 +653,7 @@ export default function Home() {
             )}
 
             {subProspek === "tambah" && (
-              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4 max-w-xl mx-auto">
                 <div className="flex justify-between items-center">
                   <h2 className="text-sm font-bold text-[#D65A75]">
                     {editingId !== null ? "✏️ Edit Data Klien" : "➕ Form Lengkap Input Prospek"}
@@ -740,7 +764,7 @@ export default function Home() {
 
         {/* ================= AREA MODE PERSONAL ================= */}
         {modeUtama === "personal" && (
-          <div className="space-y-4">
+          <div className="space-y-4 max-w-2xl mx-auto">
             <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl">
               <button
                 onClick={() => setSubPersonal("ratecard")}
