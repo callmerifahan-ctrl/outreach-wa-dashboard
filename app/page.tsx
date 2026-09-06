@@ -16,30 +16,34 @@ interface Prospek {
   kategori: string;
   status: "Baru" | "Follow-up" | "Deal" | "Ditolak";
   tanggal: string;
+  nominal?: number;
+  statusBayar?: "Belum DP" | "DP 50%" | "Lunas";
+  isArsip?: boolean;
   riwayatCatatan?: CatatanRiwayat[];
 }
 
 export default function Home() {
   const [modeUtama, setModeUtama] = useState<"prospek" | "personal">("prospek");
-  const [subProspek, setSubProspek] = useState<"list" | "kalender" | "tambah">("list");
+  const [subProspek, setSubProspek] = useState<"list" | "arsip" | "kalender" | "tambah">("list");
   const [subPersonal, setSubPersonal] = useState<"ratecard" | "template">("ratecard");
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // State dikosongkan agar murni mengambil dari Supabase tanpa tertimpa data dummy
   const [prospekList, setProspekList] = useState<Prospek[]>([]);
 
   const [filterStatus, setFilterStatus] = useState<string>("Semua");
   const [filterKategori, setFilterKategori] = useState<string>("Semua");
+  const [filterRentang, setFilterRentang] = useState<"semua" | "bulan_ini" | "hari_ini">("semua");
   const [pencarian, setPencarian] = useState("");
+  const [urutanSort, setUrutanSort] = useState<"terbaru" | "terdekat">("terdekat");
   const [isTerhubung, setIsTerhubung] = useState(true);
 
-  // State Form Quick Input (Di Halaman Utama)
+  // State Form Quick Input
   const [qNama, setQNama] = useState("");
   const [qWhatsapp, setQWhatsapp] = useState("");
   const [qKategori, setQKategori] = useState("Google Maps");
 
-  // State Form Lengkap & Edit (Tab Tambah / Mode Edit)
+  // State Form Lengkap & Edit
   const [editingId, setEditingId] = useState<number | null>(null);
   const [inputNama, setInputNama] = useState("");
   const [inputPerusahaan, setInputPerusahaan] = useState("");
@@ -47,17 +51,25 @@ export default function Home() {
   const [inputKategori, setInputKategori] = useState("Google Maps");
   const [inputStatus, setInputStatus] = useState<"Baru" | "Follow-up" | "Deal" | "Ditolak">("Baru");
   const [inputTanggal, setInputTanggal] = useState(todayStr);
+  const [inputNominal, setInputNominal] = useState<number | "">("");
+  const [inputStatusBayar, setInputStatusBayar] = useState<"Belum DP" | "DP 50%" | "Lunas">("Belum DP");
   const [inputCatatan, setInputCatatan] = useState("");
 
-  // State Input Catatan Tambahan per Klien di Kartu
+  // State Input Catatan Tambahan
   const [aktifInputCatatanId, setAktifInputCatatanId] = useState<number | null>(null);
   const [teksCatatanBaru, setTeksCatatanBaru] = useState("");
 
-  // State Mode Promo Rate Card
+  // State Pengaturan Bot Telegram & Rate Card
+  const [telegramBotToken, setTelegramBotToken] = useState("");
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [isPromoAktif, setIsPromoAktif] = useState(true);
 
   useEffect(() => {
     fetchProspek();
+    const savedToken = localStorage.getItem("tg_token") || "";
+    const savedChatId = localStorage.getItem("tg_chatid") || "";
+    setTelegramBotToken(savedToken);
+    setTelegramChatId(savedChatId);
   }, []);
 
   const fetchProspek = async () => {
@@ -76,7 +88,25 @@ export default function Home() {
     }
   };
 
-  // Fungsi Quick Input dari Beranda
+  const kirimNotifTelegram = async (pesan: string) => {
+    if (!telegramBotToken || !telegramChatId) return;
+    try {
+      await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: telegramChatId, text: pesan, parse_mode: "Markdown" })
+      });
+    } catch (err) {
+      console.error("Gagal kirim notif telegram:", err);
+    }
+  };
+
+  const simpanConfigTelegram = () => {
+    localStorage.setItem("tg_token", telegramBotToken);
+    localStorage.setItem("tg_chatid", telegramChatId);
+    alert("✅ Konfigurasi Bot Telegram berhasil disimpan!");
+  };
+
   const tambahQuickProspek = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!qNama.trim() || !qWhatsapp.trim()) {
@@ -97,6 +127,7 @@ export default function Home() {
       kategori: qKategori,
       status: "Baru",
       tanggal: todayStr,
+      isArsip: false,
       riwayatCatatan: [{ tanggal: todayStr, teks: "Input cepat dari beranda jemput bola" }]
     };
 
@@ -108,12 +139,13 @@ export default function Home() {
       setProspekList([dataBaru, ...prospekList]);
     }
 
+    kirimNotifTelegram(`⚡ *PROSPEK BARU MASUK!*\nNama: ${qNama}\nWhatsApp: ${formatWa}\nSumber: ${qKategori}`);
+
     setQNama("");
     setQWhatsapp("");
     alert("✅ Prospek baru berhasil ditambahkan!");
   };
 
-  // Simpan / Update Form Lengkap
   const simpanProspekLengkap = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputNama.trim()) return;
@@ -122,6 +154,8 @@ export default function Home() {
     if (formatWa.startsWith("0")) {
       formatWa = "62" + formatWa.slice(1);
     }
+
+    const statusArsip = inputStatus === "Deal" || inputStatus === "Ditolak";
 
     if (editingId !== null) {
       const listBaru = prospekList.map((item) => {
@@ -133,7 +167,10 @@ export default function Home() {
             whatsapp: formatWa,
             kategori: inputKategori,
             status: inputStatus,
-            tanggal: inputTanggal
+            tanggal: inputTanggal,
+            nominal: inputNominal === "" ? undefined : Number(inputNominal),
+            statusBayar: inputStatusBayar,
+            isArsip: statusArsip
           };
         }
         return item;
@@ -148,7 +185,10 @@ export default function Home() {
           whatsapp: formatWa,
           kategori: inputKategori,
           status: inputStatus,
-          tanggal: inputTanggal
+          tanggal: inputTanggal,
+          nominal: inputNominal === "" ? null : Number(inputNominal),
+          statusBayar: inputStatusBayar,
+          isArsip: statusArsip
         }).eq("id", editingId);
       } catch (err) {}
 
@@ -163,6 +203,9 @@ export default function Home() {
         kategori: inputKategori,
         status: inputStatus,
         tanggal: inputTanggal,
+        nominal: inputNominal === "" ? undefined : Number(inputNominal),
+        statusBayar: inputStatusBayar,
+        isArsip: statusArsip,
         riwayatCatatan: inputCatatan ? [{ tanggal: todayStr, teks: inputCatatan }] : []
       };
 
@@ -173,11 +216,14 @@ export default function Home() {
       } catch (err) {
         setProspekList([dataBaru, ...prospekList]);
       }
+
+      kirimNotifTelegram(`📝 *PROSPEK LENGKAP!*\nNama: ${inputNama}\nUsaha: ${inputPerusahaan}\nStatus: ${inputStatus}`);
     }
 
     setInputNama("");
     setInputPerusahaan("");
     setInputWhatsapp("");
+    setInputNominal("");
     setInputCatatan("");
     setSubProspek("list");
   };
@@ -190,14 +236,22 @@ export default function Home() {
     setInputKategori(item.kategori);
     setInputStatus(item.status);
     setInputTanggal(item.tanggal);
+    setInputNominal(item.nominal || "");
+    setInputStatusBayar(item.statusBayar || "Belum DP");
     setSubProspek("tambah");
   };
 
   const ubahStatusCepat = async (id: number, statusBaru: "Baru" | "Follow-up" | "Deal" | "Ditolak") => {
-    const listBaru = prospekList.map((item) => item.id === id ? { ...item, status: statusBaru } : item);
+    const statusArsip = statusBaru === "Deal" || statusBaru === "Ditolak";
+    const listBaru = prospekList.map((item) => item.id === id ? { ...item, status: statusBaru, isArsip: statusArsip } : item);
     setProspekList(listBaru);
+
+    if (statusArsip) {
+      kirimNotifTelegram(`🎉 *STATUS BERUBAH KE [${statusBaru.toUpperCase()}]!*\nID Klien: #${id}`);
+    }
+
     try {
-      await supabase.from("prospek").update({ status: statusBaru }).eq("id", id);
+      await supabase.from("prospek").update({ status: statusBaru, isArsip: statusArsip }).eq("id", id);
     } catch (err) {}
   };
 
@@ -236,9 +290,44 @@ export default function Home() {
     alert("Berhasil disalin! Siap ditempel.");
   };
 
+  // Fitur Ekspor ke CSV / Excel
+  const exportToCSV = () => {
+    if (prospekList.length === 0) {
+      alert("Tidak ada data untuk diekspor!");
+      return;
+    }
+
+    const headers = ["ID", "Nama", "Perusahaan", "WhatsApp", "Kategori", "Status", "Tanggal", "Nominal", "Status Bayar"];
+    const rows = prospekList.map(item => [
+      item.id,
+      `"${item.nama}"`,
+      `"${item.perusahaan}"`,
+      `"${item.whatsapp}"`,
+      `"${item.kategori}"`,
+      item.status,
+      item.tanggal,
+      item.nominal || 0,
+      item.statusBayar || "-"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `laporan_prospek_kala_project_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Fitur Cetak / Print PDF Laporan
+  const printPDFReport = () => {
+    window.print();
+  };
+
   const exportLaporan = () => {
     const totalDealCount = prospekList.filter(i => i.status === "Deal").length;
-    let laporan = `📊 *LAPORAN PROSPEK JEMPUT BOLA*\n`;
+    let laporan = `📊 *LAPORAN PROSPEK KALA PROJECT*\n`;
     laporan += `Total Klien: ${prospekList.length} | Deal: ${totalDealCount}\n\n`;
     
     prospekList.forEach((item, idx) => {
@@ -248,13 +337,24 @@ export default function Home() {
     salinTeks(laporan);
   };
 
-  const listFollowUpHariIni = prospekList.filter(item => item.tanggal === todayStr && (item.status === "Baru" || item.status === "Follow-up"));
+  const listFollowUpHariIni = prospekList.filter(item => !item.isArsip && item.tanggal === todayStr && (item.status === "Baru" || item.status === "Follow-up"));
 
   const totalDeal = prospekList.filter(i => i.status === "Deal").length;
   const totalDitolak = prospekList.filter(i => i.status === "Ditolak").length;
-  const totalProses = prospekList.filter(i => i.status === "Baru" || i.status === "Follow-up").length;
+  const totalProses = prospekList.filter(i => !i.isArsip && (i.status === "Baru" || i.status === "Follow-up")).length;
+  const jumlahArsip = prospekList.filter(i => i.isArsip).length;
+
+  // Hitung Total Omset & Konversi
+  const totalOmset = prospekList
+    .filter(i => i.status === "Deal" && i.nominal)
+    .reduce((acc, curr) => acc + (curr.nominal || 0), 0);
+  
+  const conversionRate = prospekList.length > 0 
+    ? ((totalDeal / prospekList.length) * 100).toFixed(1) 
+    : "0";
 
   const filteredList = prospekList.filter((item) => {
+    const cocokArsip = subProspek === "arsip" ? item.isArsip : !item.isArsip;
     const cocokPencarian =
       item.nama.toLowerCase().includes(pencarian.toLowerCase()) ||
       item.perusahaan.toLowerCase().includes(pencarian.toLowerCase()) ||
@@ -263,7 +363,21 @@ export default function Home() {
     const cocokStatus = filterStatus === "Semua" || item.status === filterStatus;
     const cocokKategori = filterKategori === "Semua" || item.kategori === filterKategori;
 
-    return cocokPencarian && cocokStatus && cocokKategori;
+    let cocokRentang = true;
+    if (filterRentang === "hari_ini") {
+      cocokRentang = item.tanggal === todayStr;
+    } else if (filterRentang === "bulan_ini") {
+      const bulanIniPrefix = todayStr.slice(0, 7);
+      cocokRentang = item.tanggal.startsWith(bulanIniPrefix);
+    }
+
+    return cocokArsip && cocokPencarian && cocokStatus && cocokKategori && cocokRentang;
+  }).sort((a, b) => {
+    if (urutanSort === "terdekat") {
+      return a.tanggal.localeCompare(b.tanggal);
+    } else {
+      return b.id - a.id;
+    }
   });
 
   return (
@@ -274,12 +388,11 @@ export default function Home() {
         <div className="flex flex-col md:flex-row justify-between items-center bg-white border border-[#FFD1DC] p-4 rounded-3xl shadow-xs gap-3">
           <div>
             <h1 className="text-sm md:text-base font-extrabold text-[#D65A75] flex items-center gap-1.5">
-              🚀 rifahan.dev • Sales Tracker Jemput Bola
+              🚀 Kala Project • Sales Tracker Jemput Bola
             </h1>
             <p className="text-[11px] text-slate-400">Dashboard Manajemen Klien & Portofolio</p>
           </div>
           
-          {/* SAKLAR UTAMA */}
           <div className="bg-[#FFE8EC] border border-[#FFD1DC] p-1.5 rounded-2xl grid grid-cols-2 gap-1 shadow-xs w-full md:w-auto">
             <button
               onClick={() => { setModeUtama("prospek"); setSubProspek("list"); }}
@@ -303,12 +416,18 @@ export default function Home() {
         {/* ================= AREA MODE PROSPEK ================= */}
         {modeUtama === "prospek" && (
           <div className="space-y-4">
-            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl max-w-md">
+            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl max-w-lg">
               <button
                 onClick={() => { setSubProspek("list"); setEditingId(null); }}
                 className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "list" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
               >
-                📋 Daftar Klien ({prospekList.length})
+                📋 Aktif ({prospekList.filter(i => !i.isArsip).length})
+              </button>
+              <button
+                onClick={() => { setSubProspek("arsip"); setEditingId(null); }}
+                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "arsip" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+              >
+                📦 Arsip ({jumlahArsip})
               </button>
               <button
                 onClick={() => { setSubProspek("kalender"); setEditingId(null); }}
@@ -320,22 +439,22 @@ export default function Home() {
                 onClick={() => { 
                   setSubProspek("tambah"); 
                   setEditingId(null); 
-                  setInputNama(""); setInputPerusahaan(""); setInputWhatsapp(""); setInputCatatan("");
+                  setInputNama(""); setInputPerusahaan(""); setInputWhatsapp(""); setInputNominal(""); setInputCatatan("");
                 }}
                 className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subProspek === "tambah" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
               >
-                ➕ {editingId !== null ? "Edit Data" : "Form Baru"}
+                ➕ {editingId !== null ? "Edit" : "Baru"}
               </button>
             </div>
 
-            {subProspek === "list" && (
+            {(subProspek === "list" || subProspek === "arsip") && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 
                 {/* KOLOM KIRI */}
                 <div className="space-y-3 lg:col-span-1">
                   
-                  {/* WIDGET STATISTIK PROSPEK */}
-                  <div className="grid grid-cols-3 lg:grid-cols-3 gap-2">
+                  {/* STATISTIK & ANALYTICS OMSET */}
+                  <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white border border-[#FFD1DC] p-2.5 rounded-2xl text-center shadow-xs">
                       <p className="text-[10px] text-slate-400 font-semibold">PROSES</p>
                       <p className="text-sm font-bold text-[#D65A75]">{totalProses}</p>
@@ -350,58 +469,88 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* QUICK INPUT FORM */}
-                  <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
-                    <p className="text-[11px] font-bold text-[#D65A75]">⚡ Quick Input Prospek Baru</p>
-                    <form onSubmit={tambahQuickProspek} className="grid grid-cols-1 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Nama Klien/Toko..."
-                        value={qNama}
-                        onChange={(e) => setQNama(e.target.value)}
-                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
-                      />
-                      <input
-                        type="text"
-                        placeholder="No WA (628... / 08...)"
-                        value={qWhatsapp}
-                        onChange={(e) => setQWhatsapp(e.target.value)}
-                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
-                      />
-                      <div className="flex gap-2">
-                        <select
-                          value={qKategori}
-                          onChange={(e) => setQKategori(e.target.value)}
-                          className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs text-slate-700 flex-1"
-                        >
-                          <option value="Google Maps">Google Maps</option>
-                          <option value="Instagram">Instagram</option>
-                          <option value="Rekomendasi">Rekomendasi</option>
-                        </select>
-                        <button
-                          type="submit"
-                          className="bg-[#D65A75] hover:bg-[#c24e67] text-white font-semibold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0"
-                        >
-                          + Simpan Kilat
-                        </button>
-                      </div>
-                    </form>
+                  {/* KARTU ANALYTICS TAMBAHAN (Omset & Konversi) */}
+                  <div className="bg-gradient-to-br from-[#FFE8EC] to-white border border-[#FFD1DC] p-3 rounded-2xl shadow-xs space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 font-semibold">💰 Total Omset Deal:</span>
+                      <span className="font-bold text-emerald-700">Rp {totalOmset.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 font-semibold">📈 Rasio Konversi:</span>
+                      <span className="font-bold text-[#D65A75]">{conversionRate}%</span>
+                    </div>
                   </div>
 
-                  {/* STATUS DATABASE & LAPORAN */}
-                  <div className="flex items-center justify-between bg-white border border-[#FFD1DC] rounded-2xl p-3 shadow-sm">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-600">STATUS DATABASE</p>
-                      <p className="text-xs font-bold text-slate-700 mt-0.5">
-                        {isTerhubung ? "Terhubung (Supabase) ⚡" : "Mode Offline / Lokal 💾"}
-                      </p>
+                  {/* QUICK INPUT FORM */}
+                  {subProspek === "list" && (
+                    <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                      <p className="text-[11px] font-bold text-[#D65A75]">⚡ Quick Input Prospek Baru</p>
+                      <form onSubmit={tambahQuickProspek} className="grid grid-cols-1 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Nama Klien/Toko..."
+                          value={qNama}
+                          onChange={(e) => setQNama(e.target.value)}
+                          className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="No WA (628... / 08...)"
+                          value={qWhatsapp}
+                          onChange={(e) => setQWhatsapp(e.target.value)}
+                          className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <select
+                            value={qKategori}
+                            onChange={(e) => setQKategori(e.target.value)}
+                            className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs text-slate-700 flex-1"
+                          >
+                            <option value="Google Maps">Google Maps</option>
+                            <option value="Instagram">Instagram</option>
+                            <option value="Rekomendasi">Rekomendasi</option>
+                          </select>
+                          <button
+                            type="submit"
+                            className="bg-[#D65A75] hover:bg-[#c24e67] text-white font-semibold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0"
+                          >
+                            + Simpan Kilat
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    <button
-                      onClick={exportLaporan}
-                      className="bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] text-[11px] font-semibold px-3 py-1.5 rounded-xl border border-[#FFD1DC] transition cursor-pointer"
-                    >
-                      📤 Salin Laporan
-                    </button>
+                  )}
+
+                  {/* STATUS DATABASE & TOMBOL EKSPOR / CETAK */}
+                  <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3 shadow-sm space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-600">STATUS DATABASE</p>
+                        <p className="text-xs font-bold text-slate-700 mt-0.5">
+                          {isTerhubung ? "Terhubung (Supabase) ⚡" : "Mode Offline / Lokal 💾"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 pt-1">
+                      <button
+                        onClick={exportLaporan}
+                        className="bg-[#FFE8EC] hover:bg-[#ffd6df] text-[#D65A75] text-[10px] font-semibold py-1.5 px-1 rounded-xl border border-[#FFD1DC] transition cursor-pointer text-center"
+                      >
+                        📤 Salin
+                      </button>
+                      <button
+                        onClick={exportToCSV}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold py-1.5 px-1 rounded-xl border border-emerald-200 transition cursor-pointer text-center"
+                      >
+                        📥 CSV
+                      </button>
+                      <button
+                        onClick={printPDFReport}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold py-1.5 px-1 rounded-xl border border-slate-200 transition cursor-pointer text-center"
+                      >
+                        🖨️ Cetak/PDF
+                      </button>
+                    </div>
                   </div>
 
                 </div>
@@ -410,7 +559,7 @@ export default function Home() {
                 <div className="space-y-3 lg:col-span-2">
                   
                   {/* WIDGET ALERT FOLLOW-UP HARI INI */}
-                  {listFollowUpHariIni.length > 0 && (
+                  {subProspek === "list" && listFollowUpHariIni.length > 0 && (
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 shadow-xs space-y-2">
                       <div className="flex items-center gap-1.5">
                         <span className="text-amber-600 text-sm">🔔</span>
@@ -434,33 +583,69 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* FILTER DAN PENCARIAN */}
+                  {/* FILTER, PENCARIAN, & RENTANG TANGGAL */}
                   <div className="bg-white border border-[#FFD1DC] rounded-2xl p-3.5 shadow-sm space-y-2.5">
-                    <input
-                      type="text"
-                      placeholder="Cari nama, perusahaan, atau nomor WA..."
-                      value={pencarian}
-                      onChange={(e) => setPencarian(e.target.value)}
-                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs focus:outline-none"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Cari nama, perusahaan, atau nomor WA..."
+                        value={pencarian}
+                        onChange={(e) => setPencarian(e.target.value)}
+                        className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs focus:outline-none"
+                      />
+                      <select
+                        value={urutanSort}
+                        onChange={(e) => setUrutanSort(e.target.value as any)}
+                        className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1 rounded-xl text-xs text-slate-700 shrink-0"
+                      >
+                        <option value="terdekat">🗓️ Tenggat Terdekat</option>
+                        <option value="terbaru">⚡ Paling Baru</option>
+                      </select>
+                    </div>
+
+                    <div className="flex gap-1.5 items-center">
+                      <span className="text-[10px] font-bold text-slate-400">Periode:</span>
+                      {(["semua", "hari_ini", "bulan_ini"] as const).map((rentang) => (
+                        <button
+                          key={rentang}
+                          onClick={() => setFilterRentang(rentang)}
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                            filterRentang === rentang ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
+                          }`}
+                        >
+                          {rentang === "semua" ? "Semua Waktu" : rentang === "hari_ini" ? "Hari Ini" : "Bulan Ini"}
+                        </button>
+                      ))}
+                    </div>
                     
-                    <div className="flex flex-wrap gap-1.5 items-center justify-between">
-                      {/* Filter Status */}
+                    <div className="flex flex-wrap gap-1.5 items-center justify-between pt-1 border-t border-[#FFD1DC]/40">
                       <div className="flex gap-1.5 overflow-x-auto pb-1">
-                        {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((status) => (
-                          <button
-                            key={status}
-                            onClick={() => setFilterStatus(status)}
-                            className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
-                              filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
-                            }`}
-                          >
-                            {status}
-                          </button>
-                        ))}
+                        {subProspek === "list" 
+                          ? ["Semua", "Baru", "Follow-up"].map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => setFilterStatus(status)}
+                                className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
+                                  filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
+                                }`}
+                              >
+                                {status}
+                              </button>
+                            ))
+                          : ["Semua", "Deal", "Ditolak"].map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => setFilterStatus(status)}
+                                className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border transition shrink-0 cursor-pointer ${
+                                  filterStatus === status ? "bg-[#D65A75] text-white border-[#D65A75]" : "bg-[#FFFDF9] text-slate-600 border-[#FFD1DC]"
+                                }`}
+                              >
+                                {status}
+                              </button>
+                            ))
+                        }
                       </div>
 
-                      {/* Filter Kategori Sumber */}
                       <div className="flex gap-1.5 overflow-x-auto pb-1">
                         {["Semua", "Google Maps", "Instagram", "Rekomendasi"].map((kat) => (
                           <button
@@ -481,7 +666,7 @@ export default function Home() {
                   <div className="space-y-2.5">
                     {filteredList.length === 0 ? (
                       <div className="bg-white border border-[#FFD1DC] rounded-2xl p-8 text-center space-y-2 shadow-sm">
-                        <p className="text-xs text-slate-400">Belum ada data prospek yang cocok atau database masih kosong.</p>
+                        <p className="text-xs text-slate-400">Tidak ada data prospek di kategori ini.</p>
                       </div>
                     ) : (
                       filteredList.map((item) => (
@@ -490,6 +675,17 @@ export default function Home() {
                             <div>
                               <h4 className="font-bold text-slate-800 text-xs">{item.nama}</h4>
                               <p className="text-[11px] text-slate-500">{item.perusahaan} <span className="text-[10px] text-[#D65A75]">({item.kategori})</span></p>
+                              
+                              {item.status === "Deal" && (
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-lg">
+                                    💰 Rp {item.nominal ? item.nominal.toLocaleString("id-ID") : "0"}
+                                  </span>
+                                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold px-2 py-0.5 rounded-lg">
+                                    💳 {item.statusBayar || "Belum DP"}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             
                             <div className="flex items-center gap-1.5">
@@ -506,7 +702,7 @@ export default function Home() {
                               >
                                 <option value="Baru">Baru</option>
                                 <option value="Follow-up">Follow-up</option>
-                                <option value="Deal">Deal</option>
+                                <option value="Deal">Deal 🚀</option>
                                 <option value="Ditolak">Ditolak</option>
                               </select>
 
@@ -528,7 +724,6 @@ export default function Home() {
                             </div>
                           </div>
 
-                          {/* TIMELINE RIWAYAT CATATAN */}
                           <div className="space-y-1.5 bg-[#FFFDF9] border border-[#FFD1DC] p-2.5 rounded-xl">
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-bold text-slate-500">📝 Riwayat Obrolan / Catatan:</span>
@@ -576,7 +771,7 @@ export default function Home() {
                               📱 {item.whatsapp} • 📅 {item.tanggal}
                             </span>
                             <a
-                              href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, salam kenal dari rifahan.dev! Boleh intip portofolio kita ya.`)}`}
+                              href={`https://wa.me/${item.whatsapp}?text=${encodeURIComponent(`Halo Kak ${item.nama}, salam kenal dari Kala Project! Boleh intip portofolio kita ya.`)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-semibold px-3 py-1 rounded-xl border border-emerald-200"
@@ -595,18 +790,65 @@ export default function Home() {
             )}
 
             {subProspek === "kalender" && (
-              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4 max-w-xl mx-auto">
-                <h2 className="text-sm font-bold text-[#D65A75]">📅 Kalender Jadwal Follow-up</h2>
-                <div className="space-y-2">
-                  {prospekList.map((item) => (
-                    <div key={item.id} className="border border-[#FFD1DC] p-3 rounded-2xl bg-[#FFFDF9] flex justify-between items-center text-xs">
-                      <div>
-                        <span className="font-bold text-slate-800">🗓️ {item.tanggal}</span>
-                        <p className="text-slate-600 font-medium mt-0.5">{item.nama} - {item.perusahaan}</p>
-                      </div>
-                      <span className="bg-[#FFE8EC] text-[#D65A75] px-2 py-0.5 rounded-lg text-[10px] font-semibold">{item.status}</span>
+              <div className="bg-white border border-[#FFD1DC] rounded-3xl p-5 shadow-sm space-y-4 max-w-3xl mx-auto">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-sm font-bold text-[#D65A75]">📅 Kalender Prospek Kala Project</h2>
+                  <p className="text-[11px] text-slate-400">Bulan Ini ({new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })})</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-slate-600 bg-[#FFFDF9] p-2.5 rounded-xl border border-[#FFD1DC]">
+                  <span>Keterangan Warna:</span>
+                  <span className="bg-[#FFE8EC] text-[#D65A75] px-2 py-0.5 rounded-md border border-[#FFD1DC]">Baru / Follow-up</span>
+                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md border border-emerald-200">Deal 🚀</span>
+                  <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200">Ditolak</span>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5 pt-2">
+                  {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((hari, i) => (
+                    <div key={i} className="text-center text-[11px] font-bold text-slate-400 py-1">
+                      {hari}
                     </div>
                   ))}
+
+                  {Array.from({ length: 31 }, (_, index) => {
+                    const tglAngka = index + 1;
+                    const tglStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(tglAngka).padStart(2, '0')}`;
+                    const prospekHariIni = prospekList.filter(item => item.tanggal === tglStr);
+                    const isToday = tglStr === todayStr;
+
+                    return (
+                      <div 
+                        key={index} 
+                        className={`min-h-[75px] bg-[#FFFDF9] border p-1.5 rounded-xl flex flex-col justify-between transition ${
+                          isToday ? "border-[#D65A75] ring-1 ring-[#D65A75]" : "border-[#FFD1DC]"
+                        }`}
+                      >
+                        <span className={`text-[10px] font-bold ${isToday ? "text-[#D65A75]" : "text-slate-500"}`}>
+                          {tglAngka}
+                        </span>
+
+                        <div className="space-y-1 overflow-y-auto max-h-[50px]">
+                          {prospekHariIni.map((item) => {
+                            const warnaTag = item.status === "Deal" 
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300" 
+                              : item.status === "Ditolak"
+                              ? "bg-slate-200 text-slate-600 border-slate-300"
+                              : "bg-[#FFE8EC] text-[#D65A75] border-[#FFD1DC]";
+
+                            return (
+                              <div 
+                                key={item.id} 
+                                className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border truncate ${warnaTag}`}
+                                title={`${item.nama} - ${item.perusahaan} (${item.status})`}
+                              >
+                                {item.nama}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -619,10 +861,7 @@ export default function Home() {
                   </h2>
                   {editingId !== null && (
                     <button 
-                      onClick={() => { 
-                        setEditingId(null); 
-                        setSubProspek("list"); 
-                      }}
+                      onClick={() => { setEditingId(null); setSubProspek("list"); }}
                       className="text-[10px] text-slate-400 hover:text-red-500 font-semibold"
                     >
                       Batal Edit
@@ -663,31 +902,64 @@ export default function Home() {
                       required
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500">Kategori Sumber</label>
-                    <select
-                      value={inputKategori}
-                      onChange={(e) => setInputKategori(e.target.value)}
-                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
-                    >
-                      <option value="Google Maps">Google Maps</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="Rekomendasi">Rekomendasi</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500">Kategori Sumber</label>
+                      <select
+                        value={inputKategori}
+                        onChange={(e) => setInputKategori(e.target.value)}
+                        className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
+                      >
+                        <option value="Google Maps">Google Maps</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Rekomendasi">Rekomendasi</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500">Status Prospek</label>
+                      <select
+                        value={inputStatus}
+                        onChange={(e) => setInputStatus(e.target.value as any)}
+                        className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
+                      >
+                        <option value="Baru">Baru</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Deal">Deal 🚀</option>
+                        <option value="Ditolak">Ditolak</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500">Status Prospek</label>
-                    <select
-                      value={inputStatus}
-                      onChange={(e) => setInputStatus(e.target.value as any)}
-                      className="w-full bg-[#FFFDF9] border border-[#FFD1DC] px-3.5 py-2 rounded-xl text-xs mt-1 text-slate-700"
-                    >
-                      <option value="Baru">Baru</option>
-                      <option value="Follow-up">Follow-up</option>
-                      <option value="Deal">Deal</option>
-                      <option value="Ditolak">Ditolak</option>
-                    </select>
-                  </div>
+
+                  {inputStatus === "Deal" && (
+                    <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl space-y-2">
+                      <p className="text-[11px] font-bold text-emerald-800">💰 Informasi Proyek Deal</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-emerald-700">Nominal Harga (Rp)</label>
+                          <input
+                            type="number"
+                            placeholder="350000"
+                            value={inputNominal}
+                            onChange={(e) => setInputNominal(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="w-full bg-white border border-emerald-200 px-3 py-1.5 rounded-xl text-xs mt-0.5"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-emerald-700">Status Pembayaran</label>
+                          <select
+                            value={inputStatusBayar}
+                            onChange={(e) => setInputStatusBayar(e.target.value as any)}
+                            className="w-full bg-white border border-emerald-200 px-3 py-1.5 rounded-xl text-xs mt-0.5 text-slate-700"
+                          >
+                            <option value="Belum DP">Belum DP</option>
+                            <option value="DP 50%">DP 50%</option>
+                            <option value="Lunas">Lunas</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-[10px] font-bold text-slate-500">Tanggal Follow-up</label>
                     <input
@@ -743,7 +1015,7 @@ export default function Home() {
               <div className="space-y-3">
                 <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4 flex justify-between items-center">
                   <div>
-                    <h2 className="text-xs font-bold text-[#D65A75]">🏷️ Pengaturan Harga</h2>
+                    <h2 className="text-xs font-bold text-[#D65A75]">🏷️ Pengaturan Harga Kala Project</h2>
                     <p className="text-[10px] text-[#B26B7D]">Portofolio: https://rifahan.dev</p>
                   </div>
                   <button 
@@ -755,12 +1027,39 @@ export default function Home() {
                 </div>
 
                 <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
+                  <h3 className="text-xs font-bold text-slate-800">🤖 Integrasi Notifikasi Bot Telegram</h3>
+                  <p className="text-[10px] text-slate-400">Masukkan Bot Token dan Chat ID Telegram pribadi untuk notifikasi otomatis.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                    <input
+                      type="text"
+                      placeholder="Bot Token (misal: 123456:ABC...)"
+                      value={telegramBotToken}
+                      onChange={(e) => setTelegramBotToken(e.target.value)}
+                      className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Telegram Chat ID"
+                      value={telegramChatId}
+                      onChange={(e) => setTelegramChatId(e.target.value)}
+                      className="bg-[#FFFDF9] border border-[#FFD1DC] px-3 py-1.5 rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={simpanConfigTelegram}
+                    className="w-full bg-[#FFE8EC] text-[#D65A75] text-xs font-semibold py-2 rounded-xl border border-[#FFD1DC] cursor-pointer mt-1"
+                  >
+                    💾 Simpan Konfigurasi Telegram
+                  </button>
+                </div>
+
+                <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
                   <h3 className="text-xs font-bold text-slate-800">🌐 Website Bisnis / Company Profile</h3>
                   <p className="text-sm font-extrabold text-[#D65A75]">
                     {isPromoAktif ? "Rp 350.000 (Harga Promo Awal)" : "Rp 750.000 - Rp 1.500.000"}
                   </p>
                   <button 
-                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Website Bisnis khusus bulan ini hanya Rp 350.000 saja! Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Website Bisnis profesional mulai Rp 750.000. Cek portofolio di https://rifahan.dev")}
+                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Website Bisnis khusus bulan ini dari Kala Project hanya Rp 350.000 saja! Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Website Bisnis profesional dari Kala Project mulai Rp 750.000. Cek portofolio di https://rifahan.dev")}
                     className="w-full bg-[#FFE8EC] text-[#D65A75] text-xs font-semibold py-2 rounded-xl border border-[#FFD1DC] cursor-pointer"
                   >
                     📋 Salin Penawaran Web
@@ -773,7 +1072,7 @@ export default function Home() {
                     {isPromoAktif ? "Rp 1.500.000 (Special Pilot Project)" : "Mulai Rp 2.500.000"}
                   </p>
                   <button 
-                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Web/Mobile App khusus awal kerja sama Rp 1.500.000. Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Web App mulai Rp 2.500.000. Cek portofolio di https://rifahan.dev")}
+                    onClick={() => salinTeks(isPromoAktif ? "Promo Pembuatan Web/Mobile App dari Kala Project khusus awal kerja sama Rp 1.500.000. Cek portofolio di https://rifahan.dev" : "Jasa Pembuatan Web App dari Kala Project mulai Rp 2.500.000. Cek portofolio di https://rifahan.dev")}
                     className="w-full bg-[#FFE8EC] text-[#D65A75] text-xs font-semibold py-2 rounded-xl border border-[#FFD1DC] cursor-pointer"
                   >
                     📋 Salin Penawaran App
@@ -785,30 +1084,30 @@ export default function Home() {
             {subPersonal === "template" && (
               <div className="space-y-3">
                 <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4">
-                  <h2 className="text-xs font-bold text-[#D65A75]">💬 Template Awal Chat & Portofolio</h2>
+                  <h2 className="text-xs font-bold text-[#D65A75]">💬 Template Awal Chat & Portofolio Kala Project</h2>
                   <p className="text-[10px] text-[#B26B7D]">Semua template sudah dilengkapi link https://rifahan.dev</p>
                 </div>
 
                 {[
                   { 
                     title: "☕ UMKM KULINER / SANTAI", 
-                    text: "Halo Kak, salam kenal ya! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨" 
+                    text: "Halo Kak, salam kenal dari Kala Project! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨" 
                   },
                   { 
                     title: "🏢 BISNIS FORMAL & PROFESIONAL", 
-                    text: "Selamat pagi/siang Bapak/Ibu. Kami melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝" 
+                    text: "Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝" 
                   },
                   { 
                     title: "🚀 FASHION / RETAIL (GEN Z)", 
-                    text: "Halo kak! Suka banget sama produknya 😍. Mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀" 
+                    text: "Halo kak! Suka banget sama produknya 😍. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀" 
                   },
                   { 
                     title: "📦 LANGSUNG BAWA RATE CARD PROMO", 
-                    text: "Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio kita di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄" 
+                    text: "Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄" 
                   },
                   { 
                     title: "🤝 BALASAN JIKA DITOLAK (SOFT CLOSING)", 
-                    text: "Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨" 
+                    text: "Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨" 
                   }
                 ].map((tpl, i) => (
                   <div key={i} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
