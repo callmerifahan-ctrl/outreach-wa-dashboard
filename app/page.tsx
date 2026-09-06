@@ -26,38 +26,8 @@ export default function Home() {
 
   const todayStr = new Date().toISOString().split("T")[0];
 
-  const [prospekList, setProspekList] = useState<Prospek[]>([
-    { 
-      id: 1, 
-      nama: "Ibu Siti", 
-      perusahaan: "Bakso Berkah G-Maps", 
-      whatsapp: "6281234567890", 
-      kategori: "Google Maps", 
-      status: "Baru", 
-      tanggal: todayStr, 
-      riwayatCatatan: [{ tanggal: todayStr, teks: "Tertarik tapi mau tanya suami dulu" }] 
-    },
-    { 
-      id: 2, 
-      nama: "Ka Rian", 
-      perusahaan: "Rian Store Cloth", 
-      whatsapp: "6289876543210", 
-      kategori: "Instagram", 
-      status: "Follow-up", 
-      tanggal: todayStr, 
-      riwayatCatatan: [{ tanggal: "2026-09-02", teks: "Janji kabari minggu depan setelah gajian" }] 
-    },
-    { 
-      id: 3, 
-      nama: "Bpk. Hendra", 
-      perusahaan: "Kopi Senja Lokal", 
-      whatsapp: "6281122334455", 
-      kategori: "Google Maps", 
-      status: "Deal", 
-      tanggal: "2026-09-10", 
-      riwayatCatatan: [{ tanggal: "2026-09-01", teks: "Sudah DP 50%, lanjut buat web" }] 
-    }
-  ]);
+  // State dikosongkan agar murni mengambil dari Supabase tanpa tertimpa data dummy
+  const [prospekList, setProspekList] = useState<Prospek[]>([]);
 
   const [filterStatus, setFilterStatus] = useState<string>("Semua");
   const [filterKategori, setFilterKategori] = useState<string>("Semua");
@@ -98,10 +68,10 @@ export default function Home() {
         .order("id", { ascending: false });
 
       if (error) throw error;
-      if (data && data.length > 0) setProspekList(data);
+      if (data) setProspekList(data);
       setIsTerhubung(true);
     } catch (err) {
-      console.error("Gagal terhubung ke Supabase, menggunakan data lokal:", err);
+      console.error("Gagal terhubung ke Supabase:", err);
       setIsTerhubung(false);
     }
   };
@@ -154,7 +124,6 @@ export default function Home() {
     }
 
     if (editingId !== null) {
-      // MODE EDIT DATA LAMA
       const listBaru = prospekList.map((item) => {
         if (item.id === editingId) {
           return {
@@ -186,7 +155,6 @@ export default function Home() {
       setEditingId(null);
       alert("✅ Data prospek berhasil diperbarui!");
     } else {
-      // MODE TAMBAH BARU
       const dataBaru: Prospek = {
         id: Date.now(),
         nama: inputNama,
@@ -207,7 +175,6 @@ export default function Home() {
       }
     }
 
-    // Reset Form
     setInputNama("");
     setInputPerusahaan("");
     setInputWhatsapp("");
@@ -215,7 +182,6 @@ export default function Home() {
     setSubProspek("list");
   };
 
-  // Tombol Edit Ditekan dari Kartu
   const mulaiEditProspek = (item: Prospek) => {
     setEditingId(item.id);
     setInputNama(item.nama);
@@ -224,7 +190,7 @@ export default function Home() {
     setInputKategori(item.kategori);
     setInputStatus(item.status);
     setInputTanggal(item.tanggal);
-    setSubProspek("tambah"); // Pindah otomatis ke tab form untuk ngedit
+    setSubProspek("tambah");
   };
 
   const ubahStatusCepat = async (id: number, statusBaru: "Baru" | "Follow-up" | "Deal" | "Ditolak") => {
@@ -302,7 +268,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#FFFDF9] text-slate-800 flex flex-col font-sans pb-16">
-      {/* Container utama diperlebar max-w-5xl supaya pas di layar laptop */}
       <div className="max-w-5xl w-full mx-auto p-4 md:p-6 space-y-4">
         
         {/* HEADER / JUDUL UTAMA */}
@@ -364,10 +329,9 @@ export default function Home() {
             </div>
 
             {subProspek === "list" && (
-              /* LAYOUT LAPTOP: Menggunakan Grid 2 Kolom (Kiri: Panel Kontrol & Input, Kanan: Daftar Kartu Klien) */
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                 
-                {/* KOLOM KIRI (Lebar 1 grid di laptop): Statistik, Quick Input, Filter */}
+                {/* KOLOM KIRI */}
                 <div className="space-y-3 lg:col-span-1">
                   
                   {/* WIDGET STATISTIK PROSPEK */}
@@ -442,7 +406,7 @@ export default function Home() {
 
                 </div>
 
-                {/* KOLOM KANAN (Lebar 2 grid di laptop): Alert, Pencarian, & Daftar Kartu Klien */}
+                {/* KOLOM KANAN */}
                 <div className="space-y-3 lg:col-span-2">
                   
                   {/* WIDGET ALERT FOLLOW-UP HARI INI */}
@@ -513,11 +477,11 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* DAFTAR KARTU KLIEN (Bisa jadi 2 kolom grid di layar laptop yang sangat luas) */}
+                  {/* DAFTAR KARTU KLIEN */}
                   <div className="space-y-2.5">
                     {filteredList.length === 0 ? (
                       <div className="bg-white border border-[#FFD1DC] rounded-2xl p-8 text-center space-y-2 shadow-sm">
-                        <p className="text-xs text-slate-400">Belum ada data prospek yang cocok.</p>
+                        <p className="text-xs text-slate-400">Belum ada data prospek yang cocok atau database masih kosong.</p>
                       </div>
                     ) : (
                       filteredList.map((item) => (
@@ -529,7 +493,6 @@ export default function Home() {
                             </div>
                             
                             <div className="flex items-center gap-1.5">
-                              {/* TOMBOL UBAH STATUS CEPAT */}
                               <select
                                 value={item.status}
                                 onChange={(e) => ubahStatusCepat(item.id, e.target.value as any)}
@@ -547,7 +510,6 @@ export default function Home() {
                                 <option value="Ditolak">Ditolak</option>
                               </select>
 
-                              {/* TOMBOL EDIT LENGKAP */}
                               <button
                                 onClick={() => mulaiEditProspek(item)}
                                 className="text-slate-400 hover:text-[#D65A75] text-xs p-1 cursor-pointer"
@@ -556,7 +518,6 @@ export default function Home() {
                                 ✏️
                               </button>
 
-                              {/* TOMBOL HAPUS */}
                               <button
                                 onClick={() => hapusProspek(item.id)}
                                 className="text-slate-400 hover:text-red-500 text-xs p-1 cursor-pointer"
@@ -579,7 +540,6 @@ export default function Home() {
                               </button>
                             </div>
 
-                            {/* Daftar Catatan */}
                             <div className="space-y-1 pt-1">
                               {item.riwayatCatatan && item.riwayatCatatan.length > 0 ? (
                                 item.riwayatCatatan.map((rc, idx) => (
@@ -592,7 +552,6 @@ export default function Home() {
                               )}
                             </div>
 
-                            {/* Form Tambah Catatan Kecil */}
                             {aktifInputCatatanId === item.id && (
                               <div className="pt-2 flex gap-1.5">
                                 <input
