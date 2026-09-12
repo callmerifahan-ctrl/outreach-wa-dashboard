@@ -14,7 +14,7 @@ interface WaClient {
   catatan?: string;
   tgl_followup: string;
   followup_count?: number;
-  nominal?: number | null; // <-- Tambahkan | null di sini
+  nominal?: number | null;
   statusBayar?: "Belum DP" | "DP 50%" | "Lunas";
 }
 
@@ -307,7 +307,7 @@ export default function Home() {
       cocokRentang = item.tgl_followup === todayStr;
     } else if (filterRentang === "bulan_ini") {
       const bulanIniPrefix = todayStr.slice(0, 7);
-      cocokRentang = !!item.tgl_followup && item.tgl_followup.startsWith(bulanIniPrefix);
+      cocokRentang = !!(item.tgl_followup && item.tgl_followup.startsWith(bulanIniPrefix));
     }
 
     return cocokPencarian && cocokStatus && cocokKategori && cocokRentang;
@@ -821,19 +821,28 @@ export default function Home() {
           </div>
         )}
 
-        {/* MODE PERSONAL & RATE CARD */}
+        {/* ================= AREA MODE PERSONAL ================= */}
         {modeUtama === "personal" && (
           <div className="space-y-4 max-w-2xl mx-auto">
-            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl">
+            {/* Tombol Navigasi Sub-Menu Personal yang Kontras */}
+            <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl shadow-xs">
               <button
                 onClick={() => setSubPersonal("ratecard")}
-                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subPersonal === "ratecard" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                  subPersonal === "ratecard" 
+                    ? "bg-[#D65A75] text-white shadow-xs" 
+                    : "text-slate-600 hover:bg-[#FFE8EC]/50"
+                }`}
               >
                 🏷️ Rate Card & Promo
               </button>
               <button
                 onClick={() => setSubPersonal("template")}
-                className={`flex-1 py-1.5 text-[11px] font-semibold rounded-xl transition cursor-pointer ${subPersonal === "template" ? "bg-[#FFE8EC] text-[#D65A75]" : "text-slate-500 hover:bg-slate-50"}`}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                  subPersonal === "template" 
+                    ? "bg-[#D65A75] text-white shadow-xs" 
+                    : "text-slate-600 hover:bg-[#FFE8EC]/50"
+                }`}
               >
                 💬 Template Chat
               </button>
@@ -884,10 +893,31 @@ export default function Home() {
 
             {subPersonal === "template" && (
               <div className="space-y-3">
+                <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4">
+                  <h2 className="text-xs font-bold text-[#D65A75]">💬 Daftar Template Chat & Portofolio</h2>
+                  <p className="text-[10px] text-[#B26B7D]">Semua template sudah otomatis menyertakan link https://rifahan.dev</p>
+                </div>
+
                 {[
                   { 
                     title: "☕ UMKM KULINER / SANTAI", 
                     text: "Halo Kak, salam kenal dari Kala Project! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨" 
+                  },
+                  { 
+                    title: "🏢 BISNIS FORMAL & PROFESIONAL", 
+                    text: "Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝" 
+                  },
+                  { 
+                    title: "🚀 FASHION / RETAIL (GEN Z)", 
+                    text: "Halo kak! Suka banget sama produknya 😍. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀" 
+                  },
+                  { 
+                    title: "📦 RATE CARD PROMO", 
+                    text: "Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄" 
+                  },
+                  { 
+                    title: "🤝 SOFT CLOSING (JIKA DITOLAK)", 
+                    text: "Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨" 
                   }
                 ].map((tpl, i) => (
                   <div key={i} className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
