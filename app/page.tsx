@@ -848,6 +848,7 @@ export default function Home() {
               </button>
             </div>
 
+            {/* KONTEN RATE CARD & PROMO */}
             {subPersonal === "ratecard" && (
               <div className="space-y-3">
                 <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4 flex justify-between items-center">
@@ -861,6 +862,26 @@ export default function Home() {
                   >
                     {isPromoAktif ? "✨ Mode Promo Aktif" : "📌 Mode Harga Normal"}
                   </button>
+                </div>
+
+                <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-3">
+                  <h3 className="text-xs font-bold text-slate-800">📋 Daftar Paket & Layanan</h3>
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    <div className="bg-[#FFFDF9] border border-[#FFD1DC] p-3 rounded-xl flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-slate-700">Website Bisnis / UMKM</p>
+                        <p className="text-[10px] text-slate-500">Landing page siap pakai + Domain & Hosting</p>
+                      </div>
+                      <span className="font-bold text-[#D65A75]">{isPromoAktif ? "Rp 350.000" : "Rp 500.000"}</span>
+                    </div>
+                    <div className="bg-[#FFFDF9] border border-[#FFD1DC] p-3 rounded-xl flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-slate-700">Company Profile Custom</p>
+                        <p className="text-[10px] text-slate-500">Desain eksklusif & responsif</p>
+                      </div>
+                      <span className="font-bold text-[#D65A75]">{isPromoAktif ? "Rp 750.000" : "Rp 1.000.000"}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-white border border-[#FFD1DC] p-4 rounded-2xl shadow-sm space-y-2">
@@ -891,6 +912,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* KONTEN TEMPLATE CHAT */}
             {subPersonal === "template" && (
               <div className="space-y-3">
                 <div className="bg-[#FFE8EC] border border-[#FFD1DC] rounded-3xl p-4">
