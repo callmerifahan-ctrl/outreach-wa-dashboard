@@ -824,14 +824,14 @@ export default function Home() {
         {/* ================= AREA MODE PERSONAL ================= */}
         {modeUtama === "personal" && (
           <div className="space-y-4 max-w-2xl mx-auto">
-            {/* Tombol Navigasi Sub-Menu Personal yang Kontras */}
+            {/* Tombol Sub-Menu Personal dengan Kontras Tinggi */}
             <div className="flex gap-1 bg-white border border-[#FFD1DC] p-1.5 rounded-2xl shadow-xs">
               <button
                 onClick={() => setSubPersonal("ratecard")}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                   subPersonal === "ratecard" 
                     ? "bg-[#D65A75] text-white shadow-xs" 
-                    : "text-slate-600 hover:bg-[#FFE8EC]/50"
+                    : "text-slate-700 hover:bg-[#FFE8EC]/50"
                 }`}
               >
                 🏷️ Rate Card & Promo
@@ -841,7 +841,7 @@ export default function Home() {
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
                   subPersonal === "template" 
                     ? "bg-[#D65A75] text-white shadow-xs" 
-                    : "text-slate-600 hover:bg-[#FFE8EC]/50"
+                    : "text-slate-700 hover:bg-[#FFE8EC]/50"
                 }`}
               >
                 💬 Template Chat
