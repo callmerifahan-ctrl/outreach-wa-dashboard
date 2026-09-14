@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+// Safe Supabase Initializer (mencegah error build "supabaseUrl is required" di Vercel)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface ClientType {
@@ -50,12 +51,16 @@ export default function DashboardProspek() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("wa_clients")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("wa_clients")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (!error && data) setProspekList(data);
+      if (!error && data) setProspekList(data);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+    }
     setLoading(false);
   };
 
