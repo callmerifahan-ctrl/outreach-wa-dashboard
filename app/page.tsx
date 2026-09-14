@@ -383,6 +383,7 @@ export default function DashboardProspek() {
               </div>
             )}
 
+            {/* TAB TEMPLATE CHAT LENGKAP */}
             {personalSubTab === "template" && (
               <div className="space-y-4">
                 <div className="bg-pink-50/70 border border-pink-200 p-4 rounded-2xl">
@@ -390,6 +391,7 @@ export default function DashboardProspek() {
                   <p className="text-[11px] text-pink-500 mt-0.5">Semua template sudah otomatis menyertakan link https://rifahan.dev</p>
                 </div>
 
+                {/* TEMPLATE 1 */}
                 <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
                   <h3 className="font-bold text-xs text-gray-800">☕ UMKM KULINER / SANTAI</h3>
                   <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
@@ -402,6 +404,91 @@ export default function DashboardProspek() {
                     📋 Salin Template Ini
                   </button>
                 </div>
+
+                {/* TEMPLATE 2 */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">🏢 BISNIS FORMAL & PROFESIONAL</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
+                {/* TEMPLATE 3 */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">🚀 FASHION / RETAIL (GEN Z)</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Halo kak! Suka banget sama produknya 😻. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Halo kak! Suka banget sama produknya 😻. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
+                {/* TEMPLATE 4 (DARI SCREENSHOT 1) */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">📦 RATE CARD PROMO</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
+                {/* TEMPLATE 5 (DARI SCREENSHOT 1) */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">🤝 SOFT CLOSING (JIKA DITOLAK)</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
+                {/* TEMPLATE 6 (TAMBAHAN HARIAN: FOLLOW UP H+3) */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">⏰ FOLLOW-UP PENGINGAT (H+3)</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Halo Kak! Sekadar mengingatkan kembali pesan saya kemarin dari Kala Project. Barangkali Kakak ada waktu luang untuk sekadar ngobrol santai atau konsultasi singkat seputar pembuatan website? Portofolio tetap bisa diakses di https://rifahan.dev ya Kak. Terima kasih! 😊
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Halo Kak! Sekadar mengingatkan kembali pesan saya kemarin dari Kala Project. Barangkali Kakak ada waktu luang untuk sekadar ngobrol santai atau konsultasi singkat seputar pembuatan website? Portofolio tetap bisa diakses di https://rifahan.dev ya Kak. Terima kasih! 😊")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
+                {/* TEMPLATE 7 (TAMBAHAN: REDESIGN / MAINTENANCE) */}
+                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                  <h3 className="font-bold text-xs text-gray-800">🛠️ PENAWARAN REDESIGN & MAINTENANCE</h3>
+                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                    Halo Kak, kami perhatikan website usaha Kakak sepertinya butuh penyegaran tampilan atau peningkatan kecepatan biar pengunjung semakin betah. Kala Project siap bantu optimasi & redesign dari awal. Cek standar karya kami di https://rifahan.dev ya Kak. Tertarik konsultasi dulu? 🚀
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard("Halo Kak, kami perhatikan website usaha Kakak sepertinya butuh penyegaran tampilan atau peningkatan kecepatan biar pengunjung semakin betah. Kala Project siap bantu optimasi & redesign dari awal. Cek standar karya kami di https://rifahan.dev ya Kak. Tertarik konsultasi dulu? 🚀")}
+                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                  >
+                    📋 Salin Template Ini
+                  </button>
+                </div>
+
               </div>
             )}
           </div>
