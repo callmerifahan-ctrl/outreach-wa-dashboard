@@ -19,6 +19,7 @@ export interface ClientType {
   notes?: string;
   deal_amount?: number;
   followup_count?: number;
+  tag?: "VIP" | "Warm Lead" | "High Potential" | "Standard";
 }
 
 export default function DashboardProspek() {
@@ -38,16 +39,18 @@ export default function DashboardProspek() {
   const [layanan, setLayanan] = useState("Website Bisnis");
   const [tglFollowup, setTglFollowup] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [tag, setTag] = useState<ClientType["tag"]>("Warm Lead");
 
   // Filter State
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("Semua");
   const [filterSumber, setFilterSumber] = useState("Semua");
+  const [filterFollowupCount, setFilterFollowupCount] = useState("Semua");
 
   // State Telegram Bot Config & Target Omset
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
-  const [targetOmsetBulanan] = useState(2000000);
+  const [targetOmsetBulanan, setTargetOmsetBulanan] = useState(2000000);
 
   const fetchData = async () => {
     setLoading(true);
@@ -68,14 +71,17 @@ export default function DashboardProspek() {
     fetchData();
     const savedToken = localStorage.getItem("tg_token");
     const savedChatId = localStorage.getItem("tg_chatid");
+    const savedTarget = localStorage.getItem("target_omset");
     if (savedToken) setTelegramToken(savedToken);
     if (savedChatId) setTelegramChatId(savedChatId);
+    if (savedTarget) setTargetOmsetBulanan(Number(savedTarget));
   }, []);
 
   const handleSaveTelegramConfig = () => {
     localStorage.setItem("tg_token", telegramToken);
     localStorage.setItem("tg_chatid", telegramChatId);
-    alert("Konfigurasi Telegram disimpan!");
+    localStorage.setItem("target_omset", targetOmsetBulanan.toString());
+    alert("Konfigurasi Telegram & Target Omset berhasil disimpan!");
   };
 
   const sendTelegramNotification = async (message: string) => {
@@ -126,7 +132,7 @@ export default function DashboardProspek() {
     }
   };
 
-  const handleChatWA = async (prospek: ClientType) => {
+  const handleChatWA = async (prospek: ClientType, customTemplateText?: string) => {
     const nextFollowUp = new Date();
     nextFollowUp.setDate(nextFollowUp.getDate() + 3);
     const nextFollowUpStr = nextFollowUp.toISOString().split("T")[0];
@@ -153,7 +159,10 @@ export default function DashboardProspek() {
 
     let formattedWa = prospek.no_wa.replace(/\D/g, "");
     if (formattedWa.startsWith("0")) formattedWa = "62" + formattedWa.slice(1);
-    const pesan = `Halo Kak! Saya dari Kala Project mau tanyakan terkait kebutuhan website untuk ${prospek.nama}.`;
+    
+    const pesan = customTemplateText 
+      ? customTemplateText.replace("Kak", prospek.nama)
+      : `Halo Kak! Saya dari Kala Project mau tanyakan terkait kebutuhan website untuk ${prospek.nama}. Portofolio kami bisa diklik di https://rifahan.dev ya!`;
 
     window.open(`https://wa.me/${formattedWa}?text=${encodeURIComponent(pesan)}`, "_blank");
   };
@@ -192,9 +201,9 @@ export default function DashboardProspek() {
   };
 
   const exportToCSV = () => {
-    const headers = ["ID,Nama,No WA,Layanan,Status,Tgl Followup,Sumber,Deal Amount\n"];
+    const headers = ["ID,Nama,No WA,Layanan,Status,Tgl Followup,Sumber,Deal Amount,Followup Count\n"];
     const rows = prospekList.map(
-      (i) => `"${i.id}","${i.nama}","${i.no_wa}","${i.layanan}","${i.status}","${i.tgl_followup}","${i.sumber || ""}","${i.deal_amount || 0}"`
+      (i) => `"${i.id}","${i.nama}","${i.no_wa}","${i.layanan}","${i.status}","${i.tgl_followup}","${i.sumber || ""}","${i.deal_amount || 0}","${i.followup_count || 0}"`
     );
     const blob = new Blob([headers.concat(rows.join("\n")).join("")], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
@@ -206,7 +215,7 @@ export default function DashboardProspek() {
 
   const copyDataToClipboard = () => {
     const textData = prospekList
-      .map((i) => `${i.nama} | ${i.no_wa} | ${i.status} | Tgl: ${i.tgl_followup}`)
+      .map((i) => `${i.nama} | ${i.no_wa} | ${i.status} | Tgl: ${i.tgl_followup} | FU: ${i.followup_count || 0}x`)
       .join("\n");
     navigator.clipboard.writeText(textData);
     alert("Daftar prospek berhasil disalin ke clipboard!");
@@ -217,15 +226,17 @@ export default function DashboardProspek() {
     alert("Template berhasil disalin!");
   };
 
-  // Hitung Data Statistik
+  // Hitung Data Statistik & Pipeline Potential Revenue
   const totalProses = prospekList.filter((i) => i.status === "Baru" || i.status === "Follow-up").length;
   const totalDeal = prospekList.filter((i) => i.status === "Deal").length;
   const totalDitolak = prospekList.filter((i) => i.status === "Ditolak").length;
   const totalOmset = prospekList.filter((i) => i.status === "Deal").reduce((sum, i) => sum + (i.deal_amount || 0), 0);
+  const potensiPipeline = totalProses * 350000; // Estimasi rata-rata per deal 350rb
   const rasioKonversi = prospekList.length > 0 ? ((totalDeal / prospekList.length) * 100).toFixed(1) : "0.0";
   const persentaseTargetOmset = Math.min(Math.round((totalOmset / targetOmsetBulanan) * 100), 100);
 
   // Filter List
+  const todayStr = new Date().toISOString().split("T")[0];
   const filteredProspek = prospekList.filter((item) => {
     const matchSearch =
       item.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -233,7 +244,13 @@ export default function DashboardProspek() {
       item.layanan.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "Semua" ? true : item.status === filterStatus;
     const matchSumber = filterSumber === "Semua" ? true : item.sumber === filterSumber;
-    return matchSearch && matchStatus && matchSumber;
+    
+    let matchFU = true;
+    if (filterFollowupCount === "Belum") matchFU = (item.followup_count || 0) === 0;
+    if (filterFollowupCount === "1-2x") matchFU = (item.followup_count || 0) >= 1 && (item.followup_count || 0) <= 2;
+    if (filterFollowupCount === "3x+") matchFU = (item.followup_count || 0) >= 3;
+
+    return matchSearch && matchStatus && matchSumber && matchFU;
   });
 
   // Helper Warna & Label Progres Dinamis di Kalender
@@ -325,7 +342,7 @@ export default function DashboardProspek() {
                 <div className="bg-pink-50/70 border border-pink-200 p-4 rounded-2xl flex justify-between items-center">
                   <div>
                     <h2 className="font-bold text-xs text-pink-700 flex items-center gap-1">
-                      🏷️ Pengaturan Harga Kala Project
+                      🏷️ Pengaturan Harga & Target Omset
                     </h2>
                     <p className="text-[11px] text-pink-500 mt-0.5">Portofolio: https://rifahan.dev</p>
                   </div>
@@ -356,28 +373,39 @@ export default function DashboardProspek() {
                 </div>
 
                 <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🤖 Integrasi Notifikasi Bot Telegram</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Bot Token Telegram"
-                      value={telegramToken}
-                      onChange={(e) => setTelegramToken(e.target.value)}
-                      className="p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-pink-300"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Telegram Chat ID"
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      className="p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-pink-300"
-                    />
+                  <h3 className="font-bold text-xs text-gray-800">🤖 Integrasi Telegram & Target Omset</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] text-gray-500 mb-1">Target Omset Bulanan (Rp)</label>
+                      <input
+                        type="number"
+                        value={targetOmsetBulanan}
+                        onChange={(e) => setTargetOmsetBulanan(Number(e.target.value))}
+                        className="w-full p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                      <input
+                        type="text"
+                        placeholder="Bot Token Telegram"
+                        value={telegramToken}
+                        onChange={(e) => setTelegramToken(e.target.value)}
+                        className="p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-pink-300"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Telegram Chat ID"
+                        value={telegramChatId}
+                        onChange={(e) => setTelegramChatId(e.target.value)}
+                        className="p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-pink-300"
+                      />
+                    </div>
                   </div>
                   <button
                     onClick={handleSaveTelegramConfig}
                     className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition"
                   >
-                    💾 Simpan Konfigurasi Telegram
+                    💾 Simpan Konfigurasi
                   </button>
                 </div>
               </div>
@@ -391,174 +419,31 @@ export default function DashboardProspek() {
                   <p className="text-[11px] text-pink-500 mt-0.5">Semua template sudah otomatis menyertakan link https://rifahan.dev</p>
                 </div>
 
-                {/* TEMPLATE 1 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">☕ UMKM KULINER / SANTAI</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak, salam kenal dari Kala Project! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨
+                {[
+                  { title: "☕ UMKM KULINER / SANTAI", text: "Halo Kak, salam kenal dari Kala Project! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨" },
+                  { title: "🏢 BISNIS FORMAL & PROFESIONAL", text: "Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝" },
+                  { title: "🚀 FASHION / RETAIL (GEN Z)", text: "Halo kak! Suka banget sama produknya 😻. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀" },
+                  { title: "📦 RATE CARD PROMO", text: "Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄" },
+                  { title: "🤝 SOFT CLOSING (JIKA DITOLAK)", text: "Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨" },
+                  { title: "⏰ FOLLOW-UP PENGINGAT (H+3)", text: "Halo Kak! Sekadar mengingatkan kembali pesan saya kemarin dari Kala Project. Barangkali Kakak ada waktu luang untuk sekadar ngobrol santai atau konsultasi singkat seputar pembuatan website? Portofolio tetap bisa diakses di https://rifahan.dev ya Kak. Terima kasih! 😊" },
+                  { title: "🛠️ PENAWARAN REDESIGN & MAINTENANCE", text: "Halo Kak, kami perhatikan website usaha Kakak sepertinya butuh penyegaran tampilan atau peningkatan kecepatan biar pengunjung semakin betah. Kala Project siap bantu optimasi & redesign dari awal. Cek standar karya kami di https://rifahan.dev ya Kak. Tertarik konsultasi dulu? 🚀" },
+                  { title: "📍 LAYANAN GOOGLE MAPS & LOCAL SEO", text: "Halo Kak, aku nemu lokasi usahamu di Google Maps! Kala Project punya solusi buat bantu toko Kakak lebih gampang ditemukan calon pembeli di sekitar lokasi lewat integrasi Web + Google Business. Hasil portofolio kita bisa diintip di https://rifahan.dev. Mau kita bantu rapihkan digitalnya Kak? 🗺️" },
+                  { title: "🛒 KATALOG DIGITAL / WEB E-COMMERCE", text: "Halo Kak! Capek gak sih balas manual pertanyaan harga & produk satu-satu di WA? Kala Project bisa buatkan web katalog produk praktis biar pembeli tinggal klik & kirim format order otomatis ke WA. Contoh sistem aplikasi kami bisa diklik di https://rifahan.dev ya Kak! 🛍️" },
+                  { title: "⚡ DISKON / PROMO SLOT TERBATAS", text: "Halo Kak, kabar baik! Minggu ini Kala Project lagi buka 3 slot khusus pembuatan website landing page cepat dengan potongan harga spesial + gratis domain. Contoh project yang pernah kita kerjakan ada di https://rifahan.dev. Ambil slot promonya sekarang yuk Kak sebelum penuh! 🔥" }
+                ].map((tpl, idx) => (
+                  <div key={idx} className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
+                    <h3 className="font-bold text-xs text-gray-800">{tpl.title}</h3>
+                    <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
+                      {tpl.text}
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(tpl.text)}
+                      className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
+                    >
+                      📋 Salin Template Ini
+                    </button>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak, salam kenal dari Kala Project! Aku nemu profil tokomu di Google Maps/Instagram. Mau bantu nawarin jasa buat website/menu online. Contoh karya aplikasi bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 2 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🏢 BISNIS FORMAL & PROFESIONAL</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Selamat pagi/siang Bapak/Ibu. Kami dari Kala Project melihat usaha Bapak/Ibu memiliki potensi berkembang online. Portofolio aplikasi bisnis kami dapat dilihat di https://rifahan.dev. Barangkali tertarik, mari berdiskusi. 🤝")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 3 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🚀 FASHION / RETAIL (GEN Z)</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo kak! Suka banget sama produknya 😻. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo kak! Suka banget sama produknya 😻. Dari Kala Project mau nawarin collab buat naikin omset lewat digital marketing & G-Maps. Intip portofolio app buatan kita yuk di https://rifahan.dev. Minat dibantuin gak kak? 🚀")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 4 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">📦 RATE CARD PROMO</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak, lagi cari vendor buat bikin website / aplikasi? Cek portofolio Kala Project di https://rifahan.dev ya. Kita ada promo paket lengkap mulai Rp 350rb-an aja khusus awal kerja sama. Mau dikirimin rincian harganya, Kak? 📄")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 5 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🤝 SOFT CLOSING (JIKA DITOLAK)</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Baik Kak, tidak apa-apa sama sekali, terima kasih banyak ya atas waktunya dari Kala Project! 🙏 Kalau sewaktu-waktu ke depannya butuh partner untuk pembuatan website atau aplikasi usaha, portofolio kami selalu bisa dicek di https://rifahan.dev ya Kak. Sukses selalu untuk bisnisnya! ✨")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 6 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">⏰ FOLLOW-UP PENGINGAT (H+3)</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak! Sekadar mengingatkan kembali pesan saya kemarin dari Kala Project. Barangkali Kakak ada waktu luang untuk sekadar ngobrol santai atau konsultasi singkat seputar pembuatan website? Portofolio tetap bisa diakses di https://rifahan.dev ya Kak. Terima kasih! 😊
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak! Sekadar mengingatkan kembali pesan saya kemarin dari Kala Project. Barangkali Kakak ada waktu luang untuk sekadar ngobrol santai atau konsultasi singkat seputar pembuatan website? Portofolio tetap bisa diakses di https://rifahan.dev ya Kak. Terima kasih! 😊")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 7 */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🛠️ PENAWARAN REDESIGN & MAINTENANCE</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak, kami perhatikan website usaha Kakak sepertinya butuh penyegaran tampilan atau peningkatan kecepatan biar pengunjung semakin betah. Kala Project siap bantu optimasi & redesign dari awal. Cek standar karya kami di https://rifahan.dev ya Kak. Tertarik konsultasi dulu? 🚀
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak, kami perhatikan website usaha Kakak sepertinya butuh penyegaran tampilan atau peningkatan kecepatan biar pengunjung semakin betah. Kala Project siap bantu optimasi & redesign dari awal. Cek standar karya kami di https://rifahan.dev ya Kak. Tertarik konsultasi dulu? 🚀")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 8 (BARU: GOOGLE MAPS PROSPECTING) */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">📍 LAYANAN GOOGLE MAPS & LOCAL SEO</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak, aku nemu lokasi usahamu di Google Maps! Kala Project punya solusi buat bantu toko Kakak lebih gampang ditemukan calon pembeli di sekitar lokasi lewat integrasi Web + Google Business. Hasil portofolio kita bisa diintip di https://rifahan.dev. Mau kita bantu rapihkan digitalnya Kak? 🗺️
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak, aku nemu lokasi usahamu di Google Maps! Kala Project punya solusi buat bantu toko Kakak lebih gampang ditemukan calon pembeli di sekitar lokasi lewat integrasi Web + Google Business. Hasil portofolio kita bisa diintip di https://rifahan.dev. Mau kita bantu rapihkan digitalnya Kak? 🗺️")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 9 (BARU: TOKO ONLINE & KATALOG) */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🛒 KATALOG DIGITAL / WEB E-COMMERCE</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak! Capek gak sih balas manual pertanyaan harga & produk satu-satu di WA? Kala Project bisa buatkan web katalog produk praktis biar pembeli tinggal klik & kirim format order otomatis ke WA. Contoh sistem aplikasi kami bisa diklik di https://rifahan.dev ya Kak! 🛍️
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak! Capek gak sih balas manual pertanyaan harga & produk satu-satu di WA? Kala Project bisa buatkan web katalog produk praktis biar pembeli tinggal klik & kirim format order otomatis ke WA. Contoh sistem aplikasi kami bisa diklik di https://rifahan.dev ya Kak! 🛍️")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 10 (BARU: PROMO SLOT TERBATAS) */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">⚡ DISKON / PROMO SLOT TERBATAS</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak, kabar baik! Minggu ini Kala Project lagi buka 3 slot khusus pembuatan website landing page cepat dengan potongan harga spesial + gratis domain. Contoh project yang pernah kita kerjakan ada di https://rifahan.dev. Ambil slot promonya sekarang yuk Kak sebelum penuh! 🔥
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak, kabar baik! Minggu ini Kala Project lagi buka 3 slot khusus pembuatan website landing page cepat dengan potongan harga spesial + gratis domain. Contoh project yang pernah kita kerjakan ada di https://rifahan.dev. Ambil slot promonya sekarang yuk Kak sebelum penuh! 🔥")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 11 (BARU: KONSULTAN / JASA PROFESIONAL) */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🏛️ KONSULTAN / KLINIK / JASA PROFESIONAL</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Selamat pagi/siang Kak. Website instansi/jasa yang kredibel terbukti meningkatkan kepercayaan klien hingga 80%. Kami dari Kala Project berpengalaman membangun web profesional yang elegan. Rekam jejak karya kami bisa dicek di https://rifahan.dev. Mari jadwalkan konsultasi singkat! 💼
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Selamat pagi/siang Kak. Website instansi/jasa yang kredibel terbukti meningkatkan kepercayaan klien hingga 80%. Kami dari Kala Project berpengalaman membangun web profesional yang elegan. Rekam jejak karya kami bisa dicek di https://rifahan.dev. Mari jadwalkan konsultasi singkat! 💼")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
-                {/* TEMPLATE 12 (BARU: RE-ENGAGEMENT KLIEN LAMA) */}
-                <div className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
-                  <h3 className="font-bold text-xs text-gray-800">🔄 RE-ENGAGEMENT / SAPA KLIEN LAMA</h3>
-                  <div className="bg-pink-50/20 p-3 rounded-xl border border-pink-100 text-xs text-gray-600 leading-relaxed">
-                    Halo Kak! Apa kabar usahanya? Semoga makin lancar ya. Dulu sempat ngobrol seputar website sama Kala Project. Sekarang kita ada update fitur-fitur baru & tampilan modern yang bisa dilihat di https://rifahan.dev. Barangkali sekarang saat yang tepat buat eksekusi? 😊
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard("Halo Kak! Apa kabar usahanya? Semoga makin lancar ya. Dulu sempat ngobrol seputar website sama Kala Project. Sekarang kita ada update fitur-fitur baru & tampilan modern yang bisa dilihat di https://rifahan.dev. Barangkali sekarang saat yang tepat buat eksekusi? 😊")}
-                    className="w-full bg-pink-50 border border-pink-200 text-pink-600 font-bold py-2 rounded-xl text-xs hover:bg-pink-100 transition flex justify-center items-center gap-1"
-                  >
-                    📋 Salin Template Ini
-                  </button>
-                </div>
-
+                ))}
               </div>
             )}
           </div>
@@ -790,6 +675,10 @@ export default function DashboardProspek() {
                       <span className="font-bold text-emerald-600">Rp {totalOmset.toLocaleString("id-ID")}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500 font-medium">🔮 Potensi Pipeline:</span>
+                      <span className="font-bold text-blue-600">Rp {potensiPipeline.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-500 font-medium">📈 Rasio Konversi:</span>
                       <span className="font-bold text-pink-500">{rasioKonversi}%</span>
                     </div>
@@ -873,13 +762,6 @@ export default function DashboardProspek() {
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="text-gray-400 font-medium text-[11px]">Periode:</span>
-                      <button className="px-3 py-1 bg-pink-500 text-white rounded-lg font-medium text-[11px]">Semua</button>
-                      <button className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-[11px]">Hari Ini</button>
-                      <button className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-[11px]">Bulan Ini</button>
-                    </div>
-
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((st) => (
                         <button
@@ -894,16 +776,18 @@ export default function DashboardProspek() {
                       ))}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5">
-                      {["Semua", "Google Maps", "Instagram", "Rekomendasi"].map((sb) => (
+                    {/* Filter Frekuensi Follow-up */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                      <span className="text-gray-400 font-medium text-[10px]">Follow-up:</span>
+                      {["Semua", "Belum", "1-2x", "3x+"].map((fu) => (
                         <button
-                          key={sb}
-                          onClick={() => setFilterSumber(sb)}
-                          className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                            filterSumber === sb ? "bg-slate-800 text-white" : "bg-gray-100 text-gray-500"
+                          key={fu}
+                          onClick={() => setFilterFollowupCount(fu)}
+                          className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium ${
+                            filterFollowupCount === fu ? "bg-rose-500 text-white" : "bg-gray-100 text-gray-600"
                           }`}
                         >
-                          {sb}
+                          {fu}
                         </button>
                       ))}
                     </div>
@@ -912,50 +796,76 @@ export default function DashboardProspek() {
                   <div className="space-y-3">
                     {loading ? (
                       <div className="bg-white p-6 rounded-2xl text-center text-xs text-gray-400">Loading data prospek...</div>
-                    ) : filteredProspek.map((klien) => (
-                      <div key={klien.id} className="bg-white p-4 rounded-2xl border border-pink-100 space-y-3 shadow-sm hover:border-pink-300 transition">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-bold text-gray-800 text-sm">{klien.nama}</h4>
-                            <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400">({klien.sumber || "Google Maps"})</span></p>
+                    ) : filteredProspek.map((klien) => {
+                      const isToday = klien.tgl_followup === todayStr;
+                      const isOverdue = klien.tgl_followup < todayStr && (klien.status === "Baru" || klien.status === "Follow-up");
+
+                      return (
+                        <div
+                          key={klien.id}
+                          className={`bg-white p-4 rounded-2xl border space-y-3 shadow-sm transition ${
+                            isOverdue
+                              ? "border-rose-400 ring-1 ring-rose-200"
+                              : isToday
+                              ? "border-amber-400 ring-1 ring-amber-200"
+                              : "border-pink-100 hover:border-pink-300"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-gray-800 text-sm">{klien.nama}</h4>
+                                {isOverdue && (
+                                  <span className="bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded animate-pulse">
+                                    OVERDUE
+                                  </span>
+                                )}
+                                {isToday && (
+                                  <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                                    HARI INI
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400">({klien.sumber || "Google Maps"})</span></p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={klien.status}
+                                onChange={(e) => handleStatusChange(klien.id, e.target.value as any)}
+                                className="text-xs font-semibold px-2 py-1 rounded-lg border border-pink-200 text-pink-600 bg-pink-50/50 focus:outline-none"
+                              >
+                                <option value="Baru">Baru ▾</option>
+                                <option value="Follow-up">Follow-up ▾</option>
+                                <option value="Deal">Deal 🚀</option>
+                                <option value="Ditolak">Ditolak</option>
+                              </select>
+                              <button onClick={() => handleDelete(klien.id)} className="text-gray-400 hover:text-rose-500 text-xs">🗑️</button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={klien.status}
-                              onChange={(e) => handleStatusChange(klien.id, e.target.value as any)}
-                              className="text-xs font-semibold px-2 py-1 rounded-lg border border-pink-200 text-pink-600 bg-pink-50/50 focus:outline-none"
+
+                          <div className="bg-pink-50/30 p-2.5 rounded-xl border border-pink-100 text-xs text-gray-600 space-y-0.5">
+                            <p className="flex items-center gap-1 font-medium text-gray-700">
+                              📝 Catatan: <span className="font-normal text-gray-600">{klien.notes || "Input cepat dari dashboard"}</span>
+                            </p>
+                            <p className="text-[10px] text-gray-400">Total Follow-up: {klien.followup_count || 0}x</p>
+                          </div>
+
+                          <div className="flex justify-between items-center pt-1 text-xs">
+                            <div className="flex items-center gap-3 text-gray-400 text-[11px]">
+                              <span>📱 {klien.no_wa}</span>
+                              <span>•</span>
+                              <span>📅 {klien.tgl_followup}</span>
+                            </div>
+                            <button
+                              onClick={() => handleChatWA(klien)}
+                              className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-emerald-100 transition"
                             >
-                              <option value="Baru">Baru ▾</option>
-                              <option value="Follow-up">Follow-up ▾</option>
-                              <option value="Deal">Deal 🚀</option>
-                              <option value="Ditolak">Ditolak</option>
-                            </select>
-                            <button onClick={() => handleDelete(klien.id)} className="text-gray-400 hover:text-rose-500 text-xs">🗑️</button>
+                              💬 Chat WA
+                            </button>
                           </div>
                         </div>
-
-                        <div className="bg-pink-50/30 p-2.5 rounded-xl border border-pink-100 text-xs text-gray-600 space-y-0.5">
-                          <p className="flex items-center gap-1 font-medium text-gray-700">
-                            📝 Catatan: <span className="font-normal text-gray-600">{klien.notes || "Input cepat dari dashboard"}</span>
-                          </p>
-                          <p className="text-[10px] text-gray-400">Total Follow-up: {klien.followup_count || 0}x</p>
-                        </div>
-
-                        <div className="flex justify-between items-center pt-1 text-xs">
-                          <div className="flex items-center gap-3 text-gray-400 text-[11px]">
-                            <span>📱 {klien.no_wa}</span>
-                            <span>•</span>
-                            <span>📅 {klien.tgl_followup}</span>
-                          </div>
-                          <button
-                            onClick={() => handleChatWA(klien)}
-                            className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-emerald-100 transition"
-                          >
-                            💬 Chat WA
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
