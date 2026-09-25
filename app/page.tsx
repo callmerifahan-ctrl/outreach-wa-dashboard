@@ -43,7 +43,7 @@ export default function DashboardProspek() {
   const [tglFollowup, setTglFollowup] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
 
-  // Filter State
+  // Filter State Baru (Sumber & Status)
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("Semua");
   const [filterSumber, setFilterSumber] = useState("Semua");
@@ -127,7 +127,6 @@ export default function DashboardProspek() {
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validasi langsung dari state atau nilai input
     if (!nama.trim() || !noWa.trim()) {
       alert("Mohon isi Nama Klien dan No. WhatsApp / Username IG terlebih dahulu!");
       return;
@@ -151,8 +150,6 @@ export default function DashboardProspek() {
       deal_amount: dealAmount,
       followup_count: 0,
     };
-
-    console.log("Mengirim data ke Supabase:", payload);
 
     const { data, error } = await supabase
       .from("wa_clients")
@@ -209,9 +206,16 @@ export default function DashboardProspek() {
     let targetKontak = prospek.no_whatsapp || "";
     let formattedWa = targetKontak.replace(/\D/g, "");
     if (formattedWa.startsWith("0")) formattedWa = "62" + formattedWa.slice(1);
-    const pesan = `Halo Kak! Saya dari Kala Project mau tanyakan terkait kebutuhan ${prospek.layanan} untuk ${prospek.nama}. Portofolio kami bisa diklik di https://rifahan.dev ya!`;
+    const pesan = `Halo Kak ${prospek.nama}! Saya dari Kala Project mau tanyakan terkait kebutuhan ${prospek.layanan}. Portofolio kami bisa dicek di https://rifahan.dev ya!`;
 
     window.open(`https://wa.me/${formattedWa}?text=${encodeURIComponent(pesan)}`, "_blank");
+  };
+
+  // Quick Copy Chat Template langsung dari Card
+  const handleQuickCopyChat = (prospek: ClientType) => {
+    const pesan = `Halo Kak ${prospek.nama}! Salam kenal dari Kala Project. Kami melihat usaha Kakak dan ingin menawarkan pembuatan ${prospek.layanan}. Portofolio karya kami bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨`;
+    navigator.clipboard.writeText(pesan);
+    alert(`Template chat untuk ${prospek.nama} berhasil disalin ke clipboard! 📋`);
   };
 
   const handleStatusChange = async (id: string, newStatus: ClientType["status"]) => {
@@ -281,7 +285,6 @@ export default function DashboardProspek() {
   const totalDitolak = prospekList.filter((i) => i.status === "Ditolak").length;
   const totalOmset = prospekList.filter((i) => i.status === "Deal").reduce((sum, i) => sum + (i.deal_amount || 0), 0);
   const rasioKonversi = prospekList.length > 0 ? ((totalDeal / prospekList.length) * 100).toFixed(1) : "0.0";
-  const persentaseTargetOmset = Math.min(Math.round((totalOmset / targetOmsetBulanan) * 100), 100);
 
   const porsiBakso = Math.floor(totalOmset / 15000);
   const gelasKopi = Math.floor(totalOmset / 18000);
@@ -294,6 +297,9 @@ export default function DashboardProspek() {
     if (fuCount <= 2) return { label: "☕ Warm", style: "bg-orange-50 text-orange-600 border-orange-200" };
     return { label: "👻 Ghosting Risk", style: "bg-purple-50 text-purple-600 border-purple-200" };
   };
+
+  // Cek apakah tanggal follow-up jatuh tempo hari ini
+  const todayStr = new Date().toISOString().split("T")[0];
 
   const filteredProspek = prospekList.filter((item) => {
     const matchSearch =
@@ -618,6 +624,20 @@ export default function DashboardProspek() {
                     </div>
                   </div>
 
+                  {/* 📈 STATISTIK / CONVERSION FUNNEL */}
+                  <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-2 shadow-sm">
+                    <div className="flex justify-between items-center text-xs font-bold text-pink-600">
+                      <span>📈 Konversi Penjualan</span>
+                      <span>{rasioKonversi}% Success</span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden flex">
+                      <div className="bg-blue-400 h-full" style={{ width: `${prospekList.length ? (totalProses / prospekList.length) * 100 : 0}%` }} title="Proses"></div>
+                      <div className="bg-emerald-500 h-full" style={{ width: `${prospekList.length ? (totalDeal / prospekList.length) * 100 : 0}%` }} title="Deal"></div>
+                      <div className="bg-rose-400 h-full" style={{ width: `${prospekList.length ? (totalDitolak / prospekList.length) * 100 : 0}%` }} title="Ditolak"></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Rasio perbandingan prospek aktif berujung Closed Deal.</p>
+                  </div>
+
                   {/* 🎯 WIDGET MISI HARIAN / DAILY SALES MISSION */}
                   <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-2 shadow-sm">
                     <div className="flex justify-between items-center text-xs font-bold text-pink-600">
@@ -664,12 +684,30 @@ export default function DashboardProspek() {
                 <div className="md:col-span-8 space-y-4">
                   <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-3 shadow-sm">
                     <input type="text" placeholder="Cari nama, layanan, atau nomor WhatsApp..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-2.5 text-xs border border-gray-100 rounded-xl bg-gray-50/50" />
-                    <div className="flex flex-wrap gap-1.5">
-                      {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((st) => (
-                        <button key={st} onClick={() => setFilterStatus(st)} className={`px-3 py-1 rounded-lg text-xs font-medium ${filterStatus === st ? "bg-pink-500 text-white" : "bg-white text-gray-500 border"}`}>
-                          {st}
-                        </button>
-                      ))}
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      {/* Filter Status */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((st) => (
+                          <button key={st} onClick={() => setFilterStatus(st)} className={`px-3 py-1 rounded-lg text-xs font-medium ${filterStatus === st ? "bg-pink-500 text-white" : "bg-white text-gray-500 border"}`}>
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Filter Sumber Klien Baru */}
+                      <select 
+                        value={filterSumber} 
+                        onChange={(e) => setFilterSumber(e.target.value)} 
+                        className="text-xs px-3 py-1.5 rounded-lg border border-pink-200 text-pink-600 bg-pink-50/50 outline-none font-medium"
+                      >
+                        <option value="Semua">Semua Sumber ▾</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="TikTok">TikTok</option>
+                        <option value="Google Maps">Google Maps</option>
+                        <option value="Rekomendasi">Rekomendasi</option>
+                        <option value="LinkedIn / Lainnya">LinkedIn / Lainnya</option>
+                      </select>
                     </div>
                   </div>
 
@@ -678,21 +716,31 @@ export default function DashboardProspek() {
                       <div className="bg-white p-6 rounded-2xl text-center text-xs text-gray-400">Loading data prospek...</div>
                     ) : filteredProspek.map((klien) => {
                       const tempBadge = getTemperatureBadge(klien);
+                      const isDueToday = klien.tgl_followup === todayStr;
 
                       return (
                         <div key={klien.id} className="bg-white p-4 rounded-2xl border border-pink-100 space-y-3 shadow-sm hover:border-pink-300 transition">
                           <div className="flex justify-between items-start">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="font-bold text-gray-800 text-sm">{klien.nama}</h4>
                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${tempBadge.style}`}>{tempBadge.label}</span>
+                                
+                                {/* ⏰ Urgent Badge Jika Follow-up Hari Ini */}
+                                {isDueToday && (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-rose-500 text-white animate-pulse">
+                                    ⏰ Follow-up Hari Ini!
+                                  </span>
+                                )}
                               </div>
-                              <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400">({klien.sumber || "Instagram"})</span></p>
+                              <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400 font-semibold">({klien.sumber || "Instagram"})</span></p>
                             </div>
+
+                            {/* Quick Status 1-Click Dropdown */}
                             <select
                               value={klien.status}
                               onChange={(e) => handleStatusChange(klien.id, e.target.value as any)}
-                              className="text-xs font-semibold px-2 py-1 rounded-lg border border-pink-200 text-pink-600 bg-pink-50/50"
+                              className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-pink-200 text-pink-600 bg-pink-50/50 outline-none"
                             >
                               <option value="Baru">Baru ▾</option>
                               <option value="Follow-up">Follow-up ▾</option>
@@ -714,9 +762,16 @@ export default function DashboardProspek() {
                               <span>•</span>
                               <span>📅 {klien.tgl_followup}</span>
                             </div>
-                            <button onClick={() => handleChatWA(klien)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-emerald-100">
-                              💬 Chat WA
-                            </button>
+
+                            <div className="flex gap-2">
+                              {/* 📋 Tombol Quick Copy Chat Template */}
+                              <button onClick={() => handleQuickCopyChat(klien)} className="bg-pink-50 text-pink-600 border border-pink-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-pink-100">
+                                📋 Salin Chat
+                              </button>
+                              <button onClick={() => handleChatWA(klien)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-emerald-100">
+                                💬 Chat WA
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
