@@ -37,7 +37,7 @@ export default function DashboardProspek() {
   // Form State Lengkap
   const [nama, setNama] = useState("");
   const [noWa, setNoWa] = useState("");
-  const [sumber, setSumber] = useState("Google Maps");
+  const [sumber, setSumber] = useState("Instagram");
   const [status, setStatus] = useState<ClientType["status"]>("Baru");
   const [layanan, setLayanan] = useState("Website Bisnis / UMKM");
   const [tglFollowup, setTglFollowup] = useState(new Date().toISOString().split("T")[0]);
@@ -48,10 +48,12 @@ export default function DashboardProspek() {
   const [filterStatus, setFilterStatus] = useState("Semua");
   const [filterSumber, setFilterSumber] = useState("Semua");
 
-  // State Telegram Bot Config & Target Omset
+  // State Telegram Bot Config & Target Omset & Misi Harian
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
   const [targetOmsetBulanan, setTargetOmsetBulanan] = useState(2000000);
+  const [dailyTargetCount, setDailyTargetCount] = useState(5);
+  const [completedToday, setCompletedToday] = useState(0);
 
   const fetchData = async () => {
     setLoading(true);
@@ -74,10 +76,12 @@ export default function DashboardProspek() {
     const savedChatId = localStorage.getItem("tg_chatid");
     const savedTarget = localStorage.getItem("target_omset");
     const savedPromo = localStorage.getItem("is_promo");
+    const savedMission = localStorage.getItem("completed_today");
     if (savedToken) setTelegramToken(savedToken);
     if (savedChatId) setTelegramChatId(savedChatId);
     if (savedTarget) setTargetOmsetBulanan(Number(savedTarget));
     if (savedPromo !== null) setIsPromoActive(savedPromo === "true");
+    if (savedMission) setCompletedToday(Number(savedMission));
   }, []);
 
   const triggerCelebration = () => {
@@ -155,6 +159,11 @@ export default function DashboardProspek() {
       setNotes("");
       setProspekSubTab("daftar");
 
+      // Update progress misi harian
+      const newCompleted = Math.min(completedToday + 1, dailyTargetCount);
+      setCompletedToday(newCompleted);
+      localStorage.setItem("completed_today", newCompleted.toString());
+
       if (status === "Deal") triggerCelebration();
 
       sendTelegramNotification(`🚀 <b>Prospek Baru Ditambahkan!</b>\nNama: ${nama}\nLayanan: ${layanan}\nSumber: ${sumber}\nStatus: ${status}`);
@@ -229,7 +238,7 @@ export default function DashboardProspek() {
   };
 
   const exportToCSV = () => {
-    const headers = ["ID,Nama,No WA,Layanan,Status,Tgl Followup,Sumber,Deal Amount,Followup Count\n"];
+    const headers = ["ID,Nama,No WA/IG,Layanan,Status,Tgl Followup,Sumber,Deal Amount,Followup Count\n"];
     const rows = prospekList.map(
       (i) => `"${i.id}","${i.nama}","${i.no_wa}","${i.layanan}","${i.status}","${i.tgl_followup}","${i.sumber || ""}","${i.deal_amount || 0}","${i.followup_count || 0}"`
     );
@@ -243,7 +252,7 @@ export default function DashboardProspek() {
 
   const copyDataToClipboard = () => {
     const textData = prospekList
-      .map((i) => `${i.nama} | ${i.no_wa} | ${i.layanan} | ${i.status} | Tgl: ${i.tgl_followup}`)
+      .map((i) => `${i.nama} | ${i.no_wa} | Sumber: ${i.sumber} | ${i.status} | Tgl: ${i.tgl_followup}`)
       .join("\n");
     navigator.clipboard.writeText(textData);
     alert("Daftar prospek berhasil disalin ke clipboard!");
@@ -530,16 +539,18 @@ export default function DashboardProspek() {
                     <input type="text" placeholder="Contoh: Toko Kopi Jaya" value={nama} onChange={(e) => setNama(e.target.value)} className="w-full p-3 border border-pink-100 rounded-xl bg-gray-50/30" />
                   </div>
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1">No. WhatsApp *</label>
-                    <input type="text" placeholder="62813..." value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full p-3 border border-pink-100 rounded-xl bg-gray-50/30" />
+                    <label className="block text-gray-700 font-bold mb-1">No. WhatsApp / Username IG *</label>
+                    <input type="text" placeholder="62813... atau @username_ig" value={noWa} onChange={(e) => setNoWa(e.target.value)} className="w-full p-3 border border-pink-100 rounded-xl bg-gray-50/30" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-gray-700 font-bold mb-1">Sumber</label>
+                      <label className="block text-gray-700 font-bold mb-1">Sumber Pencarian</label>
                       <select value={sumber} onChange={(e) => setSumber(e.target.value)} className="w-full p-3 border border-pink-100 rounded-xl bg-gray-50/30">
+                        <option value="Instagram">Instagram (DM)</option>
+                        <option value="TikTok">TikTok</option>
                         <option value="Google Maps">Google Maps</option>
-                        <option value="Instagram">Instagram</option>
                         <option value="Rekomendasi">Rekomendasi</option>
+                        <option value="LinkedIn / Lainnya">LinkedIn / Lainnya</option>
                       </select>
                     </div>
                     <div>
@@ -594,6 +605,18 @@ export default function DashboardProspek() {
                       <p className="text-[10px] text-rose-500 font-bold uppercase">DITOLAK</p>
                       <p className="text-xl font-bold text-rose-500">{totalDitolak}</p>
                     </div>
+                  </div>
+
+                  {/* 🎯 WIDGET MISI HARIAN / DAILY SALES MISSION */}
+                  <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-2 shadow-sm">
+                    <div className="flex justify-between items-center text-xs font-bold text-pink-600">
+                      <span>🎯 Misi Jemput Bola Harian</span>
+                      <span>{completedToday} / {dailyTargetCount} Target</span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(completedToday / dailyTargetCount) * 100}%` }}></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400">Tambah prospek baru hari ini untuk mencentang misi!</p>
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-3 shadow-sm">
@@ -653,7 +676,7 @@ export default function DashboardProspek() {
                                 <h4 className="font-bold text-gray-800 text-sm">{klien.nama}</h4>
                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${tempBadge.style}`}>{tempBadge.label}</span>
                               </div>
-                              <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400">({klien.sumber || "Google Maps"})</span></p>
+                              <p className="text-xs text-gray-400">{klien.layanan} <span className="text-rose-400">({klien.sumber || "Instagram"})</span></p>
                             </div>
                             <select
                               value={klien.status}
