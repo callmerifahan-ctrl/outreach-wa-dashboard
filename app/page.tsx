@@ -126,7 +126,9 @@ export default function DashboardProspek() {
 
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nama || !noWa) {
+    
+    // Validasi langsung dari state atau nilai input
+    if (!nama.trim() || !noWa.trim()) {
       alert("Mohon isi Nama Klien dan No. WhatsApp / Username IG terlebih dahulu!");
       return;
     }
@@ -138,21 +140,23 @@ export default function DashboardProspek() {
       if (inputNominal !== null) dealAmount = Number(inputNominal) || 0;
     }
 
+    const payload = {
+      nama: nama.trim(),
+      no_whatsapp: noWa.trim(),
+      layanan,
+      status,
+      tgl_followup: tglFollowup,
+      sumber,
+      notes: notes.trim() || "Input dari form lengkap",
+      deal_amount: dealAmount,
+      followup_count: 0,
+    };
+
+    console.log("Mengirim data ke Supabase:", payload);
+
     const { data, error } = await supabase
       .from("wa_clients")
-      .insert([
-        {
-          nama,
-          no_whatsapp: noWa,
-          layanan,
-          status,
-          tgl_followup: tglFollowup,
-          sumber,
-          notes: notes || "Input dari form lengkap",
-          deal_amount: dealAmount,
-          followup_count: 0,
-        },
-      ])
+      .insert([payload])
       .select();
 
     if (error) {
