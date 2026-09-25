@@ -442,7 +442,7 @@ export default function DashboardProspek() {
             {personalSubTab === "template" && (
               <div className="space-y-4">
                 <div className="bg-pink-50/70 border border-pink-200 p-4 rounded-2xl">
-                  <h2 className="font-bold text-xs text-pink-700">💬 Daftar 15 Template Chat & Strategi Portofolio Free</h2>
+                  <h2 className="font-bold text-xs text-pink-700">💬 Daftar 15 Template Chat & Strategi Bantuan 0 Rupiah</h2>
                   <p className="text-[11px] text-pink-500 mt-0.5">Semua template sudah otomatis menyertakan link https://rifahan.dev</p>
                 </div>
 
@@ -461,7 +461,7 @@ export default function DashboardProspek() {
                   { title: "🔄 RE-ENGAGEMENT / SAPA KLIEN LAMA", text: "Halo Kak! Apa kabar usahanya? Semoga makin lancar ya. Dulu sempat ngobrol seputar website sama Kala Project. Sekarang kita ada update fitur-fitur baru & tampilan modern yang bisa dilihat di https://rifahan.dev. Barangkali sekarang saat yang tepat buat eksekusi? 😊" },
                   { title: "🏥 KLINIK KECANTIKAN / SKINCARE", text: "Halo Kak! Saya dari Kala Project. Perhatiin klinik kecantikan Kakak punya potensi besar kalau punya sistem booking online & web profil yang estetik. Portofolio karya kami bisa dicek di https://rifahan.dev ya Kak. Mau kita bantu optimasi websitenya? ✨" },
                   { title: "🏋️ GYM / FITNESS CENTER / PT", text: "Halo Kak! Salam kenal dari Kala Project. Mau nawarin pembuatan web membership & jadwal kelas online/booking buat tempat fitness Kakak biar makin profesional. Cek portofolio aplikasi kita di https://rifahan.dev ya. Tertarik ngobrol singkat? 💪" },
-                  { title: "🎁 STRATEGI BANTUAN FREE (PORTFOLIO BUILDER)", text: "Halo Kak, salam kenal dari Kala Project! Minggu ini saya lagi ada program sosial bantu UMKM lokal buat dibuatkan landing page / optimasi Google Maps secara GRATIS (sebagai portofolio awal saya, Kakak cukup sediakan domain sendiri). Mau dibantu rapikan digital tokomu Kak? Cek karya kami di https://rifahan.dev ya! 🎁" }
+                  { title: "🎁 STRATEGI BANTUAN GOOGLE MAPS / IG (0 RUPIAH)", text: "Halo Kak, salam kenal dari Kala Project! Minggu ini saya ada program sosial bantu UMKM lokal buat klaim/optimasi Google Maps atau rapihin Bio Instagram tokonya secara GRATIS (0 rupiah, murni bantu portofolio). Toko Kakak mau dibantu rapikan tampilan digitalnya? Cek karya kami di https://rifahan.dev ya! 🎁" }
                 ].map((tpl, idx) => (
                   <div key={idx} className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
                     <h3 className="font-bold text-xs text-gray-800">{tpl.title}</h3>
