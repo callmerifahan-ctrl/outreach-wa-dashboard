@@ -12,7 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface ClientType {
   id: string;
   nama: string;
-  no_wa: string;
+  no_whatsapp: string;
   layanan: string;
   status: "Baru" | "Follow-up" | "Deal" | "Ditolak";
   tgl_followup: string;
@@ -143,7 +143,7 @@ export default function DashboardProspek() {
       .insert([
         {
           nama,
-          no_wa: noWa,
+          no_whatsapp: noWa,
           layanan,
           status,
           tgl_followup: tglFollowup,
@@ -167,7 +167,6 @@ export default function DashboardProspek() {
       setNotes("");
       setProspekSubTab("daftar");
 
-      // Update progress misi harian
       const newCompleted = Math.min(completedToday + 1, dailyTargetCount);
       setCompletedToday(newCompleted);
       localStorage.setItem("completed_today", newCompleted.toString());
@@ -203,7 +202,8 @@ export default function DashboardProspek() {
       );
     }
 
-    let formattedWa = prospek.no_wa.replace(/\D/g, "");
+    let targetKontak = prospek.no_whatsapp || "";
+    let formattedWa = targetKontak.replace(/\D/g, "");
     if (formattedWa.startsWith("0")) formattedWa = "62" + formattedWa.slice(1);
     const pesan = `Halo Kak! Saya dari Kala Project mau tanyakan terkait kebutuhan ${prospek.layanan} untuk ${prospek.nama}. Portofolio kami bisa diklik di https://rifahan.dev ya!`;
 
@@ -246,9 +246,9 @@ export default function DashboardProspek() {
   };
 
   const exportToCSV = () => {
-    const headers = ["ID,Nama,No WA/IG,Layanan,Status,Tgl Followup,Sumber,Deal Amount,Followup Count\n"];
+    const headers = ["ID,Nama,No WhatsApp,Layanan,Status,Tgl Followup,Sumber,Deal Amount,Followup Count\n"];
     const rows = prospekList.map(
-      (i) => `"${i.id}","${i.nama}","${i.no_wa}","${i.layanan}","${i.status}","${i.tgl_followup}","${i.sumber || ""}","${i.deal_amount || 0}","${i.followup_count || 0}"`
+      (i) => `"${i.id}","${i.nama}","${i.no_whatsapp}","${i.layanan}","${i.status}","${i.tgl_followup}","${i.sumber || ""}","${i.deal_amount || 0}","${i.followup_count || 0}"`
     );
     const blob = new Blob([headers.concat(rows.join("\n")).join("")], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
@@ -260,7 +260,7 @@ export default function DashboardProspek() {
 
   const copyDataToClipboard = () => {
     const textData = prospekList
-      .map((i) => `${i.nama} | ${i.no_wa} | Sumber: ${i.sumber} | ${i.status} | Tgl: ${i.tgl_followup}`)
+      .map((i) => `${i.nama} | ${i.no_whatsapp} | Sumber: ${i.sumber} | ${i.status} | Tgl: ${i.tgl_followup}`)
       .join("\n");
     navigator.clipboard.writeText(textData);
     alert("Daftar prospek berhasil disalin ke clipboard!");
@@ -294,7 +294,7 @@ export default function DashboardProspek() {
   const filteredProspek = prospekList.filter((item) => {
     const matchSearch =
       item.nama.toLowerCase().includes(search.toLowerCase()) ||
-      item.no_wa.includes(search) ||
+      (item.no_whatsapp && item.no_whatsapp.includes(search)) ||
       item.layanan.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "Semua" ? true : item.status === filterStatus;
     const matchSumber = filterSumber === "Semua" ? true : item.sumber === filterSumber;
@@ -365,7 +365,6 @@ export default function DashboardProspek() {
 
             {personalSubTab === "ratecard" && (
               <div className="space-y-4">
-                {/* 🏷️ TOGGLE INTERAKTIF MODE PROMO */}
                 <div className="bg-white p-4 rounded-2xl border border-pink-100 flex justify-between items-center shadow-sm">
                   <div>
                     <h2 className="font-bold text-xs text-pink-700 flex items-center gap-1">🏷️ Pengaturan Mode Diskon / Promo</h2>
@@ -660,7 +659,7 @@ export default function DashboardProspek() {
                 {/* RIGHT CONTENT */}
                 <div className="md:col-span-8 space-y-4">
                   <div className="bg-white p-4 rounded-2xl border border-pink-100 space-y-3 shadow-sm">
-                    <input type="text" placeholder="Cari nama, layanan, atau nomor WA..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-2.5 text-xs border border-gray-100 rounded-xl bg-gray-50/50" />
+                    <input type="text" placeholder="Cari nama, layanan, atau nomor WhatsApp..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full p-2.5 text-xs border border-gray-100 rounded-xl bg-gray-50/50" />
                     <div className="flex flex-wrap gap-1.5">
                       {["Semua", "Baru", "Follow-up", "Deal", "Ditolak"].map((st) => (
                         <button key={st} onClick={() => setFilterStatus(st)} className={`px-3 py-1 rounded-lg text-xs font-medium ${filterStatus === st ? "bg-pink-500 text-white" : "bg-white text-gray-500 border"}`}>
@@ -707,7 +706,7 @@ export default function DashboardProspek() {
 
                           <div className="flex justify-between items-center pt-1 text-xs">
                             <div className="flex items-center gap-3 text-gray-400 text-[11px]">
-                              <span>📱 {klien.no_wa}</span>
+                              <span>📱 {klien.no_whatsapp}</span>
                               <span>•</span>
                               <span>📅 {klien.tgl_followup}</span>
                             </div>
