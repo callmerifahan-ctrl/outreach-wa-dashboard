@@ -211,7 +211,6 @@ export default function DashboardProspek() {
     window.open(`https://wa.me/${formattedWa}?text=${encodeURIComponent(pesan)}`, "_blank");
   };
 
-  // Quick Copy Chat Template langsung dari Card
   const handleQuickCopyChat = (prospek: ClientType) => {
     const pesan = `Halo Kak ${prospek.nama}! Salam kenal dari Kala Project. Kami melihat usaha Kakak dan ingin menawarkan pembuatan ${prospek.layanan}. Portofolio karya kami bisa dicek di https://rifahan.dev ya Kak. Boleh intip sebentar? ✨`;
     navigator.clipboard.writeText(pesan);
@@ -298,7 +297,6 @@ export default function DashboardProspek() {
     return { label: "👻 Ghosting Risk", style: "bg-purple-50 text-purple-600 border-purple-200" };
   };
 
-  // Cek apakah tanggal follow-up jatuh tempo hari ini
   const todayStr = new Date().toISOString().split("T")[0];
 
   const filteredProspek = prospekList.filter((item) => {
@@ -369,7 +367,7 @@ export default function DashboardProspek() {
                   personalSubTab === "template" ? "bg-rose-500 text-white shadow-sm" : "text-gray-600 hover:bg-pink-50"
                 }`}
               >
-                💬 Template Chat (12)
+                💬 Template Chat (15)
               </button>
             </div>
 
@@ -444,7 +442,7 @@ export default function DashboardProspek() {
             {personalSubTab === "template" && (
               <div className="space-y-4">
                 <div className="bg-pink-50/70 border border-pink-200 p-4 rounded-2xl">
-                  <h2 className="font-bold text-xs text-pink-700">💬 Daftar 12 Template Chat & Portofolio</h2>
+                  <h2 className="font-bold text-xs text-pink-700">💬 Daftar 15 Template Chat & Strategi Portofolio Free</h2>
                   <p className="text-[11px] text-pink-500 mt-0.5">Semua template sudah otomatis menyertakan link https://rifahan.dev</p>
                 </div>
 
@@ -460,7 +458,10 @@ export default function DashboardProspek() {
                   { title: "🛒 KATALOG DIGITAL / WEB E-COMMERCE", text: "Halo Kak! Capek gak sih balas manual pertanyaan harga & produk satu-satu di WA? Kala Project bisa buatkan web katalog produk praktis biar pembeli tinggal klik & kirim format order otomatis ke WA. Contoh sistem aplikasi kami bisa diklik di https://rifahan.dev ya Kak! 🛍️" },
                   { title: "⚡ DISKON / PROMO SLOT TERBATAS", text: "Halo Kak, kabar baik! Minggu ini Kala Project lagi buka 3 slot khusus pembuatan website landing page cepat dengan potongan harga spesial + gratis domain. Contoh project yang pernah kita kerjakan ada di https://rifahan.dev. Ambil slot promonya sekarang yuk Kak sebelum penuh! 🔥" },
                   { title: "🏛️ KONSULTAN / KLINIK / JASA PROFESIONAL", text: "Selamat pagi/siang Kak. Website instansi/jasa yang kredibel terbukti meningkatkan kepercayaan klien hingga 80%. Kami dari Kala Project berpengalaman membangun web profesional yang elegan. Rekam jejak karya kami bisa dicek di https://rifahan.dev. Mari jadwalkan konsultasi singkat! 💼" },
-                  { title: "🔄 RE-ENGAGEMENT / SAPA KLIEN LAMA", text: "Halo Kak! Apa kabar usahanya? Semoga makin lancar ya. Dulu sempat ngobrol seputar website sama Kala Project. Sekarang kita ada update fitur-fitur baru & tampilan modern yang bisa dilihat di https://rifahan.dev. Barangkali sekarang saat yang tepat buat eksekusi? 😊" }
+                  { title: "🔄 RE-ENGAGEMENT / SAPA KLIEN LAMA", text: "Halo Kak! Apa kabar usahanya? Semoga makin lancar ya. Dulu sempat ngobrol seputar website sama Kala Project. Sekarang kita ada update fitur-fitur baru & tampilan modern yang bisa dilihat di https://rifahan.dev. Barangkali sekarang saat yang tepat buat eksekusi? 😊" },
+                  { title: "🏥 KLINIK KECANTIKAN / SKINCARE", text: "Halo Kak! Saya dari Kala Project. Perhatiin klinik kecantikan Kakak punya potensi besar kalau punya sistem booking online & web profil yang estetik. Portofolio karya kami bisa dicek di https://rifahan.dev ya Kak. Mau kita bantu optimasi websitenya? ✨" },
+                  { title: "🏋️ GYM / FITNESS CENTER / PT", text: "Halo Kak! Salam kenal dari Kala Project. Mau nawarin pembuatan web membership & jadwal kelas online/booking buat tempat fitness Kakak biar makin profesional. Cek portofolio aplikasi kita di https://rifahan.dev ya. Tertarik ngobrol singkat? 💪" },
+                  { title: "🎁 STRATEGI BANTUAN FREE (PORTFOLIO BUILDER)", text: "Halo Kak, salam kenal dari Kala Project! Minggu ini saya lagi ada program sosial bantu UMKM lokal buat dibuatkan landing page / optimasi Google Maps secara GRATIS (sebagai portofolio awal saya, Kakak cukup sediakan domain sendiri). Mau dibantu rapikan digital tokomu Kak? Cek karya kami di https://rifahan.dev ya! 🎁" }
                 ].map((tpl, idx) => (
                   <div key={idx} className="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm space-y-3">
                     <h3 className="font-bold text-xs text-gray-800">{tpl.title}</h3>
@@ -726,7 +727,6 @@ export default function DashboardProspek() {
                                 <h4 className="font-bold text-gray-800 text-sm">{klien.nama}</h4>
                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${tempBadge.style}`}>{tempBadge.label}</span>
                                 
-                                {/* ⏰ Urgent Badge Jika Follow-up Hari Ini */}
                                 {isDueToday && (
                                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-rose-500 text-white animate-pulse">
                                     ⏰ Follow-up Hari Ini!
@@ -764,7 +764,6 @@ export default function DashboardProspek() {
                             </div>
 
                             <div className="flex gap-2">
-                              {/* 📋 Tombol Quick Copy Chat Template */}
                               <button onClick={() => handleQuickCopyChat(klien)} className="bg-pink-50 text-pink-600 border border-pink-200 px-3 py-1 rounded-xl text-xs font-semibold hover:bg-pink-100">
                                 📋 Salin Chat
                               </button>
