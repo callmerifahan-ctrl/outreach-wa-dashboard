@@ -126,7 +126,10 @@ export default function DashboardProspek() {
 
   const handleSimpan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nama || !noWa) return;
+    if (!nama || !noWa) {
+      alert("Mohon isi Nama Klien dan No. WhatsApp / Username IG terlebih dahulu!");
+      return;
+    }
 
     let dealAmount = 0;
     if (status === "Deal") {
@@ -152,7 +155,12 @@ export default function DashboardProspek() {
       ])
       .select();
 
-    if (!error && data) {
+    if (error) {
+      alert("Gagal menyimpan ke database: " + error.message);
+      return;
+    }
+
+    if (data) {
       setProspekList((prev) => [data[0], ...prev]);
       setNama("");
       setNoWa("");
